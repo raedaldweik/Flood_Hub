@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = REPO_ROOT / "data"
+# Seed inputs (geojson, storm csv, fleet, protocols). Overridable so a packaged install
+# (Docker image) can point at /app/data regardless of where the package itself lives.
+DATA_DIR = Path(os.environ.get("SADD_DATA_DIR", REPO_ROOT / "data"))
 
 
 class Settings(BaseSettings):
@@ -30,6 +33,11 @@ class Settings(BaseSettings):
     # Doha reference point for Open-Meteo (no key required).
     open_meteo_lat: float = 25.2854
     open_meteo_lng: float = 51.5310
+
+    # Production/Railway: seed automatically when the database is empty, and serve the static
+    # frontend export from this process (path to frontend/out; empty = API only).
+    seed_on_startup: bool = True
+    frontend_dist: str = ""
 
     # Keys — all optional; features degrade gracefully when missing.
     gemini_api_key: str = ""

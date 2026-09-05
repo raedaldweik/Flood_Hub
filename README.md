@@ -89,6 +89,12 @@ engine escalation/clear-down, replay math, API smoke).
 | `GEMINI_API_KEY` | Rafid (ADK) + embeddings (Phase 3) | Rafid shows an offline notice |
 | — | Open-Meteo needs **no key** | seed falls back to a bundled synthetic storm curve, clearly labelled |
 
+## Deploying (Railway)
+
+Two services built from this repo: `sadd-db` (PostGIS + pgvector image, one volume) and
+`sadd-app` (one container: FastAPI serving the API and the Next.js static export, seeding
+itself on first boot). Steps and the full variable list: **[docs/DEPLOY_RAILWAY.md](docs/DEPLOY_RAILWAY.md)**.
+
 ## Data honesty
 
 * **Rain**: `make seed` pulls hourly Doha precipitation for 15–17 April 2024 from Open-Meteo's
@@ -125,7 +131,8 @@ and the agent. The agent can only *propose*; the single path to changing asset s
 ```
 ├─ CLAUDE.md                 the spec (read first)
 ├─ docker-compose.yml        Postgres 16 + PostGIS + pgvector (docker/postgres/Dockerfile)
-├─ Makefile                  setup · db · schema · seed · train · dev · test · lint
+├─ Makefile                  setup · db · schema · seed · train · dev · test · lint · export · prod
+├─ Dockerfile · railway.json production image (frontend build + FastAPI) for Railway / any Docker host
 ├─ backend/                  FastAPI — sadd/{api,rules,sim,models,agent}, sql/, tests/
 ├─ frontend/                 Next.js 15 · TypeScript strict · Tailwind 4 · zustand · SWR · recharts
 ├─ flood-forecasting-mcp/    custom MCP server (Phase 3)

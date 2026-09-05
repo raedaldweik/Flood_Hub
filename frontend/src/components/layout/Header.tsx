@@ -21,7 +21,8 @@ const TABS = [
 export function Header({ meta }: { meta?: Meta }) {
   const lang = useUi((s) => s.lang);
   const setLang = useUi((s) => s.setLang);
-  const pathname = usePathname();
+  // trailingSlash export → "/simulation/"; normalise so the active tab matches either form.
+  const pathname = (usePathname() ?? "/").replace(/\/+$/, "") || "/";
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {

@@ -1,0 +1,15 @@
+# Keep local artifacts and secrets out of the build context; the frontend is built in-image.
+**/node_modules
+**/.next
+**/out
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/.env
+**/.env.local
+**/.env.*.local
+backend/.venv
+.venv
+.git
+docs/screenshots

@@ -23,6 +23,7 @@ def get_pool() -> ConnectionPool:
             min_size=1,
             max_size=8,
             kwargs={"row_factory": dict_row},
+            timeout=5.0,  # fail fast so startup retries stay snappy when the DB is not up yet
             open=True,
         )
     return _pool

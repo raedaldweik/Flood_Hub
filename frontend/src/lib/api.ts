@@ -3,6 +3,7 @@
  * keep the two in sync (a generated OpenAPI client is a Phase-4 nicety, not a need).
  */
 
+/** Empty string = same origin (the production image, where FastAPI serves the static export). */
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
 export type Severity = "yellow" | "orange" | "red";

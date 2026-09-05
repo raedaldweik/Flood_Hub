@@ -57,6 +57,12 @@ dev: ## run backend + frontend together (Ctrl-C stops both)
 	@trap 'kill 0' INT TERM; \
 	  ( $(MAKE) backend ) & ( $(MAKE) frontend ) & wait
 
+export: ## build the Next.js static export (frontend/out)
+	cd frontend && npm run build
+
+prod: export ## production shape locally: FastAPI serving API + static export on :8000
+	cd backend && FRONTEND_DIST=$(CURDIR)/frontend/out $(CURDIR)/$(PYBIN)/uvicorn sadd.main:app --port 8000
+
 test: ## pytest for rules + sim + api
 	cd backend && $(CURDIR)/$(PYBIN)/pytest -q
 
@@ -64,4 +70,4 @@ lint: ## ruff (python) + eslint/tsc (frontend)
 	cd backend && $(CURDIR)/$(PYBIN)/ruff check sadd tests
 	cd frontend && npm run lint && npx tsc --noEmit
 
-.PHONY: help setup db db-down db-reset schema seed train backend frontend dev test lint
+.PHONY: help setup db db-down db-reset schema seed train backend frontend dev export prod test lint
