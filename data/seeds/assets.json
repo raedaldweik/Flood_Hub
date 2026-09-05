@@ -1,0 +1,48 @@
+{
+  "description": "PROJECT SADD demo fleet: 24 mobile pump trucks + 8 tanker crews, staged at five fictional depots around Doha. All callsigns, depots and crew leads are fictional.",
+  "depots": [
+    { "id": "depot_north",   "name_en": "North Depot (Umm Lekhba)",     "name_ar": "مستودع الشمال (أم لخبا)",      "lat": 25.3360, "lng": 51.4560 },
+    { "id": "depot_central", "name_en": "Central Depot (Al Sadd)",      "name_ar": "المستودع المركزي (السد)",      "lat": 25.2830, "lng": 51.4990 },
+    { "id": "depot_east",    "name_en": "East Depot (Ras Abu Aboud)",   "name_ar": "مستودع الشرق (راس أبو عبود)",  "lat": 25.2905, "lng": 51.5660 },
+    { "id": "depot_south",   "name_en": "South Depot (Industrial Area)","name_ar": "مستودع الجنوب (المنطقة الصناعية)","lat": 25.2040, "lng": 51.4550 },
+    { "id": "depot_wakrah",  "name_en": "Wakrah Depot",                 "name_ar": "مستودع الوكرة",               "lat": 25.1760, "lng": 51.5950 }
+  ],
+  "callsign_prefix": {
+    "pump_truck": { "en": "SAQR", "ar": "صقر" },
+    "tanker":     { "en": "SAHAB", "ar": "سحاب" }
+  },
+  "fleet": [
+    { "id": "PT-01", "type": "pump_truck", "capacity_m3_h": 400, "depot": "depot_central" },
+    { "id": "PT-02", "type": "pump_truck", "capacity_m3_h": 400, "depot": "depot_central" },
+    { "id": "PT-03", "type": "pump_truck", "capacity_m3_h": 300, "depot": "depot_central" },
+    { "id": "PT-04", "type": "pump_truck", "capacity_m3_h": 300, "depot": "depot_central" },
+    { "id": "PT-05", "type": "pump_truck", "capacity_m3_h": 250, "depot": "depot_central" },
+    { "id": "PT-06", "type": "pump_truck", "capacity_m3_h": 250, "depot": "depot_central" },
+    { "id": "PT-07", "type": "pump_truck", "capacity_m3_h": 400, "depot": "depot_east" },
+    { "id": "PT-08", "type": "pump_truck", "capacity_m3_h": 300, "depot": "depot_east" },
+    { "id": "PT-09", "type": "pump_truck", "capacity_m3_h": 300, "depot": "depot_east" },
+    { "id": "PT-10", "type": "pump_truck", "capacity_m3_h": 250, "depot": "depot_east" },
+    { "id": "PT-11", "type": "pump_truck", "capacity_m3_h": 200, "depot": "depot_east" },
+    { "id": "PT-12", "type": "pump_truck", "capacity_m3_h": 400, "depot": "depot_north" },
+    { "id": "PT-13", "type": "pump_truck", "capacity_m3_h": 300, "depot": "depot_north" },
+    { "id": "PT-14", "type": "pump_truck", "capacity_m3_h": 250, "depot": "depot_north" },
+    { "id": "PT-15", "type": "pump_truck", "capacity_m3_h": 250, "depot": "depot_north" },
+    { "id": "PT-16", "type": "pump_truck", "capacity_m3_h": 200, "depot": "depot_north" },
+    { "id": "PT-17", "type": "pump_truck", "capacity_m3_h": 400, "depot": "depot_south" },
+    { "id": "PT-18", "type": "pump_truck", "capacity_m3_h": 300, "depot": "depot_south" },
+    { "id": "PT-19", "type": "pump_truck", "capacity_m3_h": 300, "depot": "depot_south" },
+    { "id": "PT-20", "type": "pump_truck", "capacity_m3_h": 250, "depot": "depot_south" },
+    { "id": "PT-21", "type": "pump_truck", "capacity_m3_h": 200, "depot": "depot_south" },
+    { "id": "PT-22", "type": "pump_truck", "capacity_m3_h": 300, "depot": "depot_wakrah" },
+    { "id": "PT-23", "type": "pump_truck", "capacity_m3_h": 250, "depot": "depot_wakrah" },
+    { "id": "PT-24", "type": "pump_truck", "capacity_m3_h": 200, "depot": "depot_wakrah" },
+    { "id": "TK-01", "type": "tanker", "capacity_m3_h": 120, "depot": "depot_central" },
+    { "id": "TK-02", "type": "tanker", "capacity_m3_h": 120, "depot": "depot_central" },
+    { "id": "TK-03", "type": "tanker", "capacity_m3_h": 100, "depot": "depot_east" },
+    { "id": "TK-04", "type": "tanker", "capacity_m3_h": 100, "depot": "depot_east" },
+    { "id": "TK-05", "type": "tanker", "capacity_m3_h": 100, "depot": "depot_north" },
+    { "id": "TK-06", "type": "tanker", "capacity_m3_h": 80,  "depot": "depot_south" },
+    { "id": "TK-07", "type": "tanker", "capacity_m3_h": 80,  "depot": "depot_south" },
+    { "id": "TK-08", "type": "tanker", "capacity_m3_h": 80,  "depot": "depot_wakrah" }
+  ]
+}

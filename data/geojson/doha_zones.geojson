@@ -1,0 +1,727 @@
+{
+ "type": "FeatureCollection",
+ "name": "doha_zones",
+ "description": "PROJECT SADD demo zones. Twelve simplified, approximate district polygons over Doha for a FICTIONAL flood operations center. Boundaries are hand-drawn approximations of real district locations; attributes are plausible synthetic values, not official data.",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "west_bay",
+    "name_en": "West Bay",
+    "name_ar": "الخليج الغربي",
+    "elevation_m": 4,
+    "imperviousness_pct": 88,
+    "drainage_capacity_mm_per_h": 22,
+    "population": 32000,
+    "has_underpass": true,
+    "criticality": 5,
+    "rain_factor": 1.15,
+    "notes": "Dense high-rise business district on reclaimed coastal land; tunnels under the main boulevards."
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       51.5225,
+       25.3145
+      ],
+      [
+       51.53,
+       25.312
+      ],
+      [
+       51.535,
+       25.3135
+      ],
+      [
+       51.54,
+       25.3185
+      ],
+      [
+       51.5395,
+       25.3265
+      ],
+      [
+       51.534,
+       25.332
+      ],
+      [
+       51.527,
+       25.3335
+      ],
+      [
+       51.5205,
+       25.328
+      ],
+      [
+       51.5195,
+       25.32
+      ],
+      [
+       51.5225,
+       25.3145
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "corniche",
+    "name_en": "Corniche",
+    "name_ar": "الكورنيش",
+    "elevation_m": 2,
+    "imperviousness_pct": 80,
+    "drainage_capacity_mm_per_h": 18,
+    "population": 6000,
+    "has_underpass": true,
+    "criticality": 4,
+    "rain_factor": 1.15,
+    "notes": "Waterfront crescent at sea level; underpasses at the main interchanges."
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       51.53,
+       25.311
+      ],
+      [
+       51.5265,
+       25.3125
+      ],
+      [
+       51.523,
+       25.308
+      ],
+      [
+       51.522,
+       25.302
+      ],
+      [
+       51.524,
+       25.296
+      ],
+      [
+       51.529,
+       25.291
+      ],
+      [
+       51.535,
+       25.288
+      ],
+      [
+       51.5405,
+       25.287
+      ],
+      [
+       51.54,
+       25.291
+      ],
+      [
+       51.5345,
+       25.2925
+      ],
+      [
+       51.53,
+       25.2955
+      ],
+      [
+       51.527,
+       25.2995
+      ],
+      [
+       51.5262,
+       25.304
+      ],
+      [
+       51.5275,
+       25.308
+      ],
+      [
+       51.53,
+       25.311
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "al_sadd",
+    "name_en": "Al Sadd",
+    "name_ar": "السد",
+    "elevation_m": 9,
+    "imperviousness_pct": 90,
+    "drainage_capacity_mm_per_h": 12,
+    "population": 45000,
+    "has_underpass": true,
+    "criticality": 5,
+    "rain_factor": 1.05,
+    "notes": "Dense mixed-use core; the main intersection underpass is a known flood hotspot."
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       51.495,
+       25.2755
+      ],
+      [
+       51.5085,
+       25.2745
+      ],
+      [
+       51.516,
+       25.2775
+      ],
+      [
+       51.5165,
+       25.288
+      ],
+      [
+       51.511,
+       25.2945
+      ],
+      [
+       51.502,
+       25.2955
+      ],
+      [
+       51.4945,
+       25.2905
+      ],
+      [
+       51.4935,
+       25.282
+      ],
+      [
+       51.495,
+       25.2755
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "al_mansoura",
+    "name_en": "Al Mansoura",
+    "name_ar": "المنصورة",
+    "elevation_m": 8,
+    "imperviousness_pct": 91,
+    "drainage_capacity_mm_per_h": 11,
+    "population": 41000,
+    "has_underpass": false,
+    "criticality": 3,
+    "rain_factor": 1.05,
+    "notes": "Older high-density residential grid with limited storm drains."
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       51.529,
+       25.2765
+      ],
+      [
+       51.54,
+       25.276
+      ],
+      [
+       51.549,
+       25.2775
+      ],
+      [
+       51.5495,
+       25.285
+      ],
+      [
+       51.544,
+       25.2895
+      ],
+      [
+       51.534,
+       25.289
+      ],
+      [
+       51.528,
+       25.285
+      ],
+      [
+       51.529,
+       25.2765
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "najma",
+    "name_en": "Najma",
+    "name_ar": "نجمة",
+    "elevation_m": 7,
+    "imperviousness_pct": 92,
+    "drainage_capacity_mm_per_h": 10,
+    "population": 38000,
+    "has_underpass": true,
+    "criticality": 5,
+    "rain_factor": 1.05,
+    "notes": "Low-lying dense district; the ring-road underpass floods in most major storms."
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       51.5335,
+       25.2615
+      ],
+      [
+       51.545,
+       25.2605
+      ],
+      [
+       51.557,
+       25.2625
+      ],
+      [
+       51.558,
+       25.27
+      ],
+      [
+       51.5525,
+       25.2752
+      ],
+      [
+       51.54,
+       25.2755
+      ],
+      [
+       51.532,
+       25.272
+      ],
+      [
+       51.5335,
+       25.2615
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "old_airport",
+    "name_en": "Old Airport",
+    "name_ar": "المطار القديم",
+    "elevation_m": 6,
+    "imperviousness_pct": 85,
+    "drainage_capacity_mm_per_h": 13,
+    "population": 52000,
+    "has_underpass": true,
+    "criticality": 4,
+    "rain_factor": 1.1,
+    "notes": "Residential and commercial belt around the former airport; several road underpasses."
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       51.544,
+       25.2435
+      ],
+      [
+       51.56,
+       25.2425
+      ],
+      [
+       51.5765,
+       25.245
+      ],
+      [
+       51.5775,
+       25.256
+      ],
+      [
+       51.57,
+       25.2615
+      ],
+      [
+       51.556,
+       25.262
+      ],
+      [
+       51.545,
+       25.2585
+      ],
+      [
+       51.544,
+       25.2435
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "airport",
+    "name_en": "Airport Zone",
+    "name_ar": "منطقة المطار",
+    "elevation_m": 3,
+    "imperviousness_pct": 70,
+    "drainage_capacity_mm_per_h": 28,
+    "population": 3000,
+    "has_underpass": false,
+    "criticality": 5,
+    "rain_factor": 1.2,
+    "notes": "International airport and approach roads on reclaimed coastal land; critical national infrastructure."
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       51.585,
+       25.238
+      ],
+      [
+       51.605,
+       25.236
+      ],
+      [
+       51.635,
+       25.24
+      ],
+      [
+       51.642,
+       25.256
+      ],
+      [
+       51.636,
+       25.278
+      ],
+      [
+       51.615,
+       25.283
+      ],
+      [
+       51.592,
+       25.279
+      ],
+      [
+       51.584,
+       25.262
+      ],
+      [
+       51.585,
+       25.238
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "madinat_khalifa",
+    "name_en": "Madinat Khalifa",
+    "name_ar": "مدينة خليفة",
+    "elevation_m": 18,
+    "imperviousness_pct": 78,
+    "drainage_capacity_mm_per_h": 16,
+    "population": 58000,
+    "has_underpass": true,
+    "criticality": 3,
+    "rain_factor": 0.95,
+    "notes": "Established villa districts north and south of the expressway; interchange underpasses."
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       51.4625,
+       25.2985
+      ],
+      [
+       51.48,
+       25.297
+      ],
+      [
+       51.5,
+       25.299
+      ],
+      [
+       51.501,
+       25.315
+      ],
+      [
+       51.496,
+       25.33
+      ],
+      [
+       51.478,
+       25.332
+      ],
+      [
+       51.463,
+       25.325
+      ],
+      [
+       51.4615,
+       25.31
+      ],
+      [
+       51.4625,
+       25.2985
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "al_rayyan",
+    "name_en": "Al Rayyan",
+    "name_ar": "الريان",
+    "elevation_m": 27,
+    "imperviousness_pct": 72,
+    "drainage_capacity_mm_per_h": 17,
+    "population": 70000,
+    "has_underpass": true,
+    "criticality": 3,
+    "rain_factor": 0.9,
+    "notes": "Large inland residential district on higher ground; tunnels on the main west-east corridor."
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       51.4,
+       25.27
+      ],
+      [
+       51.425,
+       25.268
+      ],
+      [
+       51.458,
+       25.271
+      ],
+      [
+       51.459,
+       25.29
+      ],
+      [
+       51.452,
+       25.305
+      ],
+      [
+       51.43,
+       25.3065
+      ],
+      [
+       51.405,
+       25.302
+      ],
+      [
+       51.398,
+       25.285
+      ],
+      [
+       51.4,
+       25.27
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "education_city",
+    "name_en": "Education City",
+    "name_ar": "المدينة التعليمية",
+    "elevation_m": 30,
+    "imperviousness_pct": 55,
+    "drainage_capacity_mm_per_h": 30,
+    "population": 12000,
+    "has_underpass": false,
+    "criticality": 3,
+    "rain_factor": 0.9,
+    "notes": "Modern campus district with generous landscaping and newer drainage."
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       51.42,
+       25.309
+      ],
+      [
+       51.44,
+       25.308
+      ],
+      [
+       51.46,
+       25.311
+      ],
+      [
+       51.4605,
+       25.326
+      ],
+      [
+       51.452,
+       25.336
+      ],
+      [
+       51.433,
+       25.3365
+      ],
+      [
+       51.419,
+       25.329
+      ],
+      [
+       51.42,
+       25.309
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "industrial_area",
+    "name_en": "Industrial Area",
+    "name_ar": "المنطقة الصناعية",
+    "elevation_m": 22,
+    "imperviousness_pct": 95,
+    "drainage_capacity_mm_per_h": 8,
+    "population": 110000,
+    "has_underpass": false,
+    "criticality": 4,
+    "rain_factor": 0.95,
+    "notes": "Vast paved warehouse and workshop grid with minimal formal drainage; very large resident workforce."
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       51.415,
+       25.176
+      ],
+      [
+       51.445,
+       25.174
+      ],
+      [
+       51.475,
+       25.177
+      ],
+      [
+       51.478,
+       25.2
+      ],
+      [
+       51.47,
+       25.225
+      ],
+      [
+       51.445,
+       25.227
+      ],
+      [
+       51.42,
+       25.22
+      ],
+      [
+       51.413,
+       25.198
+      ],
+      [
+       51.415,
+       25.176
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "al_wakrah_edge",
+    "name_en": "Al Wakrah (north edge)",
+    "name_ar": "الوكرة (الحافة الشمالية)",
+    "elevation_m": 5,
+    "imperviousness_pct": 65,
+    "drainage_capacity_mm_per_h": 12,
+    "population": 34000,
+    "has_underpass": true,
+    "criticality": 3,
+    "rain_factor": 1.1,
+    "notes": "Fast-growing coastal suburb; bypass underpasses and low-lying new developments."
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       51.57,
+       25.151
+      ],
+      [
+       51.595,
+       25.149
+      ],
+      [
+       51.62,
+       25.153
+      ],
+      [
+       51.623,
+       25.172
+      ],
+      [
+       51.615,
+       25.195
+      ],
+      [
+       51.59,
+       25.197
+      ],
+      [
+       51.57,
+       25.19
+      ],
+      [
+       51.568,
+       25.17
+      ],
+      [
+       51.57,
+       25.151
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}
