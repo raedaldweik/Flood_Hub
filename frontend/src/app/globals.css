@@ -1,0 +1,202 @@
+@import "tailwindcss";
+
+/* ── PROJECT SADD design tokens — dark command center, no light mode ──────── */
+@theme {
+  --color-bg: #070b14;
+  --color-bg-2: #0a0e1a;
+  --color-panel: rgba(13, 19, 35, 0.72);
+  --color-panel-solid: #0f1526;
+  --color-line: rgba(148, 163, 184, 0.14);
+  --color-line-2: rgba(148, 163, 184, 0.26);
+  --color-fg: #e6eaf2;
+  --color-fg-2: #aab3c5;
+  --color-muted: #7c8699;
+  --color-accent: #22d3ee;
+  --color-accent-2: #0ea5e9;
+  --color-green: #22c55e;
+  --color-yellow: #eab308;
+  --color-orange: #f97316;
+  --color-red: #ef4444;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-arabic: var(--font-arabic), var(--font-inter), system-ui, sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", Menlo, monospace;
+
+  --radius-panel: 14px;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+}
+
+html[dir="rtl"] body {
+  font-family: var(--font-arabic);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1, "cv11" 1;
+  overflow: hidden;
+}
+
+/* Glass panels */
+.glass {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-radius: var(--radius-panel);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.glass-strong {
+  background: rgba(10, 14, 26, 0.9);
+}
+
+.hairline {
+  border-color: var(--color-line);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.label {
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+html[dir="rtl"] .label {
+  letter-spacing: 0;
+}
+
+/* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+}
+
+/* Status dots */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+}
+.dot-pulse {
+  box-shadow: 0 0 0 0 currentColor;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(255, 255, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
+/* Scrubber */
+input[type="range"].scrubber {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--color-accent) 0%,
+    var(--color-accent) var(--pct, 0%),
+    rgba(148, 163, 184, 0.25) var(--pct, 0%),
+    rgba(148, 163, 184, 0.25) 100%
+  );
+  outline: none;
+}
+html[dir="rtl"] input[type="range"].scrubber {
+  background: linear-gradient(
+    to left,
+    var(--color-accent) 0%,
+    var(--color-accent) var(--pct, 0%),
+    rgba(148, 163, 184, 0.25) var(--pct, 0%),
+    rgba(148, 163, 184, 0.25) 100%
+  );
+}
+input[type="range"].scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid var(--color-accent);
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.18);
+  cursor: pointer;
+}
+input[type="range"].scrubber::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid var(--color-accent);
+  cursor: pointer;
+}
+
+/* Map containers */
+gmp-map-3d,
+.map-fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Subtle grid + vignette behind everything (visible when the map is loading) */
+.backdrop {
+  background:
+    radial-gradient(1200px 600px at 60% 30%, rgba(34, 211, 238, 0.06), transparent 60%),
+    radial-gradient(900px 500px at 20% 90%, rgba(14, 165, 233, 0.05), transparent 60%),
+    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px) 0 0 / 48px 48px,
+    var(--color-bg);
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-out both;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.maplibregl-ctrl-attrib {
+  background: rgba(7, 11, 20, 0.6) !important;
+  color: #7c8699 !important;
+  font-size: 10px !important;
+}
+.maplibregl-ctrl-attrib a {
+  color: #aab3c5 !important;
+}
