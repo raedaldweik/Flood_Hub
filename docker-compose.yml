@@ -1,0 +1,28 @@
+# PROJECT SADD — local infrastructure.
+# Draft 1 runs ONE database for relational + geospatial + vector data
+# (Postgres 16 + PostGIS + pgvector). On GCP this splits into BigQuery and
+# Vertex AI Search — see README "Migration map".
+services:
+  db:
+    build: ./docker/postgres
+    container_name: sadd-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sadd}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sadd}
+      POSTGRES_DB: ${POSTGRES_DB:-sadd}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - sadd-pgdata:/var/lib/postgresql/data
+      # Extensions + schema are applied on first boot, in filename order.
+      - ./backend/sql/00_extensions.sql:/docker-entrypoint-initdb.d/00_extensions.sql:ro
+      - ./backend/sql/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sadd} -d ${POSTGRES_DB:-sadd}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  sadd-pgdata:
