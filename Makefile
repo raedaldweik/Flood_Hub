@@ -44,6 +44,9 @@ schema: ## (re)apply extensions + schema
 seed: ## load reference data + precompute the April-2024 replay
 	cd backend && $(CURDIR)/$(PYBIN)/python -m sadd.seed
 
+buildings: ## fetch OpenStreetMap tower footprints for the risk-lit 3D layer (© OSM contributors)
+	cd backend && $(CURDIR)/$(PYBIN)/python -m sadd.buildings
+
 train: ## train risk + time-to-drain models (Phase 2)
 	cd backend && $(CURDIR)/$(PYBIN)/python -m sadd.models.train
 

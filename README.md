@@ -86,7 +86,7 @@ engine escalation/clear-down, replay math, API smoke).
 
 | Variable | Purpose | Missing → |
 |---|---|---|
-| `NEXT_PUBLIC_GOOGLE_MAPS_KEY` | Google 3D map — imagery on terrain; no photorealistic mesh in Qatar yet (enable **Maps JavaScript API** + **Map Tiles API**) | dark 2D MapLibre fallback with a banner |
+| `NEXT_PUBLIC_GOOGLE_MAPS_KEY` | Google 3D map with risk-lit towers — imagery on terrain; no photorealistic mesh in Qatar yet (enable **Maps JavaScript API** + **Map Tiles API**) | dark 2D MapLibre fallback with a banner |
 | `GEMINI_API_KEY` | Rafid (ADK) + embeddings (Phase 3) | Rafid shows an offline notice |
 | — | Open-Meteo needs **no key** | seed falls back to a bundled synthetic storm curve, clearly labelled |
 
@@ -153,3 +153,15 @@ and the agent. The agent can only *propose*; the single path to changing asset s
 
 ---
 *Fictional operations center for demonstration. Uses Google APIs; not endorsed by or affiliated with Google or any government entity.*
+
+## Risk-lit towers (why the 3D buildings are ours)
+
+Google's Photorealistic 3D Tiles do not cover Qatar, so `Map3DElement` draws satellite imagery on
+terrain. The building volume on the map comes from OpenStreetMap instead: `backend/sadd/buildings.py`
+pulls every footprint with a height (or level count) in central Doha from the Overpass API, keeps
+towers of 30 m and up (about 400), tags each with the zone it stands in, and the frontend extrudes
+them as translucent `Polygon3DElement`s. Towers in normal zones are calm glass; from the yellow band
+up they take their zone's risk colour, so a district turning red lights up its skyline. The layer
+fetches at Docker build time (`make buildings` locally), degrades to nothing if Overpass is down, and
+can be toggled from the pill on the map. Data © OpenStreetMap contributors (ODbL), credited on the map.
+The day Google adds Qatar to the photorealistic mesh, the same element shows it with no code change.

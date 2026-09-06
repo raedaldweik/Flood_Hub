@@ -31,3 +31,5 @@ data/cache/
 .idea/
 .vscode/
 *.log
+# fetched at build time from OpenStreetMap (make buildings)
+data/geojson/doha_buildings.geojson

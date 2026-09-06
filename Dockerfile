@@ -24,6 +24,9 @@ COPY backend/sadd /app/backend/sadd
 RUN pip install --upgrade pip && pip install -e /app/backend
 COPY backend/sql /app/backend/sql
 COPY data /app/data
+# Risk-lit towers: OpenStreetMap footprints with heights for central Doha (sadd/buildings.py).
+# Best effort — an unreachable Overpass API means no towers, never a failed build.
+RUN cd /app/backend && SADD_DATA_DIR=/app/data python -m sadd.buildings || true
 COPY --from=frontend-build /app/frontend/out /app/frontend/out
 ENV FRONTEND_DIST=/app/frontend/out \
     SADD_DATA_DIR=/app/data \

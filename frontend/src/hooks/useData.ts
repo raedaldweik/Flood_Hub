@@ -7,6 +7,7 @@ import {
   type AgentStatus,
   type Alert,
   type Asset,
+  type BuildingCollection,
   type LiveState,
   type LiveWeather,
   type Meta,
@@ -37,6 +38,10 @@ export function useAlerts(enabled = true) {
 }
 export function useAssets(enabled = true) {
   return useSWR<Asset[]>(enabled ? endpoints.assets : null, fetchJson, STATIC);
+}
+/** Towers are static build-time data; fetched only once the 3D map is up. */
+export function useBuildings(enabled: boolean) {
+  return useSWR<BuildingCollection>(enabled ? endpoints.buildings : null, fetchJson, STATIC);
 }
 export function useAgentStatus() {
   return useSWR<AgentStatus>(endpoints.agentStatus, fetchJson, STATIC);

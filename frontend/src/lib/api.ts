@@ -159,6 +159,26 @@ export interface Meta {
   disclaimers: { en: string; ar: string };
 }
 
+/** Risk-lit towers: OpenStreetMap footprints with heights, tagged with the zone they stand in. */
+export interface BuildingProperties {
+  osm_id: number;
+  name: string | null;
+  height_m: number;
+  levels: number | null;
+  zone_id: string | null;
+  centroid: [number, number];
+}
+export interface BuildingFeature {
+  type: "Feature";
+  geometry: { type: "Polygon"; coordinates: number[][][] };
+  properties: BuildingProperties;
+}
+export interface BuildingCollection {
+  type: "FeatureCollection";
+  features: BuildingFeature[];
+  properties?: { available?: boolean; count?: number; source?: string; fetched_at?: string };
+}
+
 export interface LiveWeather {
   available: boolean;
   source: string;
@@ -213,6 +233,7 @@ export async function fetchJson<T>(path: string): Promise<T> {
 export const endpoints = {
   meta: "/api/meta",
   zones: "/api/zones",
+  buildings: "/api/buildings",
   timeline: "/api/replay/timeline",
   alerts: "/api/alerts",
   assets: "/api/assets",

@@ -36,6 +36,9 @@ interface UiState {
   requestReset: () => void;
   skylineRequest: number;
   requestSkyline: () => void;
+  /** Risk-lit towers layer on the 3D map (OpenStreetMap footprints, lit by zone risk). */
+  towers: boolean;
+  setTowers: (on: boolean) => void;
 
   rafidOpen: boolean;
   setRafidOpen: (o: boolean) => void;
@@ -74,6 +77,8 @@ export const useUi = create<UiState>((set) => ({
   requestReset: () => set((s) => ({ selectedZone: null, resetRequest: s.resetRequest + 1 })),
   skylineRequest: 0,
   requestSkyline: () => set((s) => ({ selectedZone: null, skylineRequest: s.skylineRequest + 1 })),
+  towers: true,
+  setTowers: (towers) => set({ towers }),
 
   rafidOpen: true,
   setRafidOpen: (rafidOpen) => set({ rafidOpen }),

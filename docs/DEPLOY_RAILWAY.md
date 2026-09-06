@@ -98,6 +98,11 @@ set it now. Follow the steps in order.
   change on the day Google adds Qatar. If you *do* see an error mentioning "Map Tiles API"
   in F12 → Console, that API is disabled or blocked by the key's restrictions — fix that
   first.
+- **No towers on the 3D map:** the building volume is OpenStreetMap data fetched during the
+  Docker build (`[buildings] wrote N towers` in the build log). If that line says `failed`,
+  the Overpass API was busy — Deployments → ⋮ → **Redeploy** to fetch again. The pill on the
+  map shows the tower count and lets you switch the layer off if it ever stutters over
+  screen share.
 - **Map shows the 2D fallback banner:** the Maps key was empty when Railway built the image.
   Set it, then Deployments → ⋮ → **Redeploy** (the key is baked in at build time).
 - **"Database not seeded" or "Backend unreachable":** open `sadd-app` → Deployments → View

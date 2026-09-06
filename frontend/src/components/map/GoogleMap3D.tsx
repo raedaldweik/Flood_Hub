@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { ZoneFeature } from "@/lib/api";
+import type { BuildingFeature, ZoneFeature } from "@/lib/api";
 import { ESTABLISHING, SKYLINE, zoneCamera, type Camera } from "@/lib/camera";
 import { loadMaps3D } from "@/lib/googleMaps";
 import { quantiseRisk, riskColor, riskColorAlpha } from "@/lib/risk";
@@ -16,11 +16,20 @@ interface Props {
   flyRequest: number;
   resetRequest: number;
   skylineRequest: number;
+  /** Risk-lit towers: OSM footprints extruded to their height, lit by their zone's risk. */
+  buildings: BuildingFeature[];
+  showTowers: boolean;
   onReady: () => void;
   onError: (message: string) => void;
 }
 
 type Polygon = google.maps.maps3d.Polygon3DElement;
+type Tower = { el: Polygon; zone: string | null };
+
+// Calm glass for towers in normal zones; risk colours take over from the yellow band up.
+const TOWER_GLASS_FILL = "rgba(125, 211, 252, 0.30)";
+const TOWER_GLASS_STROKE = "rgba(186, 230, 253, 0.55)";
+const TOWER_BATCH = 40; // polygons created per frame so a 400-tower skyline never freezes one
 
 function toCamera(c: Camera): google.maps.maps3d.CameraOptions {
   return { center: { lat: c.lat, lng: c.lng, altitude: c.altitude ?? 0 }, range: c.range, tilt: c.tilt, heading: c.heading };
@@ -39,14 +48,26 @@ const ORBIT = {
  * Zones are draped Polygon3DInteractiveElements coloured by risk; the camera drifts slowly
  * around the establishing shot and flies to a zone on request.
  */
-export function GoogleMap3D({ apiKey, zones, states, selected, onSelect, flyRequest, resetRequest, skylineRequest, onReady, onError }: Props) {
+export function GoogleMap3D({
+  apiKey, zones, states, selected, onSelect, flyRequest, resetRequest, skylineRequest, buildings, showTowers, onReady, onError,
+}: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.maps3d.Map3DElement | null>(null);
   const polys = useRef<Map<string, Polygon>>(new Map());
   const lastColor = useRef<Map<string, string>>(new Map());
+  const towers = useRef<Map<number, Tower>>(new Map());
+  const towerColor = useRef<Map<number, string>>(new Map());
+  const buildingsRef = useRef(buildings);
+  buildingsRef.current = buildings;
+  const showTowersRef = useRef(showTowers);
+  showTowersRef.current = showTowers;
+  const statesRef = useRef(states);
+  statesRef.current = states;
+  const syncTowersRef = useRef<() => void>(() => {});
   const drifting = useRef(false);
   const libRef = useRef<google.maps.Maps3DLibrary | null>(null);
   const syncRef = useRef<() => void>(() => {});
+  const paintTowersRef = useRef<() => void>(() => {});
   const zonesRef = useRef(zones);
   zonesRef.current = zones;
   const onSelectRef = useRef(onSelect);
@@ -58,6 +79,8 @@ export function GoogleMap3D({ apiKey, zones, states, selected, onSelect, flyRequ
     const el = container.current;
     if (!el) return;
     const polyMap = polys.current;
+    const towerMap = towers.current;
+    const towerColorMap = towerColor.current;
 
     (async () => {
       try {
@@ -75,6 +98,7 @@ export function GoogleMap3D({ apiKey, zones, states, selected, onSelect, flyRequ
 
         libRef.current = lib;
         syncPolygons();
+        syncTowers();
         onReady();
         startDrift();
       } catch (err) {
@@ -105,6 +129,55 @@ export function GoogleMap3D({ apiKey, zones, states, selected, onSelect, flyRequ
     }
     syncRef.current = syncPolygons;
 
+    function paintTowers() {
+      for (const [id, { el, zone }] of towerMap) {
+        const risk = zone ? (statesRef.current[zone]?.risk ?? 0) : 0;
+        const q = quantiseRisk(risk);
+        const key = q < 40 ? "glass" : String(q);
+        if (towerColorMap.get(id) === key) continue;
+        towerColorMap.set(id, key);
+        if (key === "glass") {
+          el.fillColor = TOWER_GLASS_FILL;
+          el.strokeColor = TOWER_GLASS_STROKE;
+        } else {
+          el.fillColor = riskColorAlpha(q, q >= 60 ? 0.62 : 0.5);
+          el.strokeColor = riskColorAlpha(q, 0.9);
+        }
+      }
+    }
+
+    function syncTowers() {
+      const map = mapRef.current;
+      const lib = libRef.current;
+      if (!map || !lib) return;
+      const pending = buildingsRef.current.filter((b) => !towerMap.has(b.properties.osm_id));
+      if (!pending.length) return;
+      let i = 0;
+      const step = () => {
+        if (cancelled || mapRef.current !== map) return;
+        for (const b of pending.slice(i, i + TOWER_BATCH)) {
+          const ring = b.geometry.coordinates[0] ?? [];
+          const el = new lib.Polygon3DElement({
+            altitudeMode: "RELATIVE_TO_GROUND",
+            extruded: true,
+            fillColor: TOWER_GLASS_FILL,
+            strokeColor: TOWER_GLASS_STROKE,
+            strokeWidth: 1,
+            drawsOccludedSegments: false,
+            outerCoordinates: ring.map(([lng, lat]) => ({ lat: lat!, lng: lng!, altitude: b.properties.height_m })),
+          });
+          towerMap.set(b.properties.osm_id, { el, zone: b.properties.zone_id });
+          if (showTowersRef.current) map.append(el);
+        }
+        i += TOWER_BATCH;
+        paintTowers();
+        if (i < pending.length) setTimeout(step, 16);
+      };
+      step();
+    }
+    syncTowersRef.current = syncTowers;
+    paintTowersRef.current = paintTowers;
+
     function startDrift() {
       const map = mapRef.current;
       if (!map || drifting.current) return;
@@ -116,6 +189,8 @@ export function GoogleMap3D({ apiKey, zones, states, selected, onSelect, flyRequ
       cancelled = true;
       mapRef.current?.stopCameraAnimation();
       polyMap.clear();
+      towerMap.clear();
+      towerColorMap.clear();
       el.replaceChildren();
       mapRef.current = null;
     };
@@ -126,6 +201,29 @@ export function GoogleMap3D({ apiKey, zones, states, selected, onSelect, flyRequ
   useEffect(() => {
     syncRef.current();
   }, [zones]);
+
+  // Towers arrive after the map is ready (fetched once 3D is up).
+  useEffect(() => {
+    syncTowersRef.current();
+  }, [buildings]);
+
+  // Light the towers by their zone's risk; only touched when a zone's quantised band moves.
+  useEffect(() => {
+    paintTowersRef.current();
+  }, [states]);
+
+  // Layer toggle: detach or re-attach every tower element.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    for (const { el } of towers.current.values()) {
+      if (showTowers) {
+        if (!el.isConnected) map.append(el);
+      } else {
+        el.remove();
+      }
+    }
+  }, [showTowers]);
 
   // Recolour polygons when risk moves (quantised to avoid churn at 20×).
   useEffect(() => {
