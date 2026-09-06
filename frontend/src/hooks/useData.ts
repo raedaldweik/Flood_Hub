@@ -16,21 +16,27 @@ import {
 } from "@/lib/api";
 
 const STATIC = { revalidateOnFocus: false, revalidateOnReconnect: false, dedupingInterval: 60_000 };
+const STARTUP_POLL_MS = 2_500;
 
 export function useMeta() {
-  return useSWR<Meta>(endpoints.meta, fetchJson, { ...STATIC, refreshInterval: 30_000 });
+  return useSWR<Meta>(endpoints.meta, fetchJson, {
+    ...STATIC,
+    // Poll quickly while the backend is still waiting for Postgres or seeding, then settle down.
+    refreshInterval: (data) => (data && data.startup?.phase !== "ready" ? STARTUP_POLL_MS : 30_000),
+  });
 }
-export function useZones() {
-  return useSWR<ZoneCollection>(endpoints.zones, fetchJson, STATIC);
+// Data hooks accept `enabled` so a first boot never hammers routes that answer 503 until `ready`.
+export function useZones(enabled = true) {
+  return useSWR<ZoneCollection>(enabled ? endpoints.zones : null, fetchJson, STATIC);
 }
-export function useTimeline() {
-  return useSWR<Timeline>(endpoints.timeline, fetchJson, STATIC);
+export function useTimeline(enabled = true) {
+  return useSWR<Timeline>(enabled ? endpoints.timeline : null, fetchJson, STATIC);
 }
-export function useAlerts() {
-  return useSWR<Alert[]>(endpoints.alerts, fetchJson, STATIC);
+export function useAlerts(enabled = true) {
+  return useSWR<Alert[]>(enabled ? endpoints.alerts : null, fetchJson, STATIC);
 }
-export function useAssets() {
-  return useSWR<Asset[]>(endpoints.assets, fetchJson, STATIC);
+export function useAssets(enabled = true) {
+  return useSWR<Asset[]>(enabled ? endpoints.assets : null, fetchJson, STATIC);
 }
 export function useAgentStatus() {
   return useSWR<AgentStatus>(endpoints.agentStatus, fetchJson, STATIC);

@@ -6,51 +6,27 @@ from FRONTEND_DIST, so the whole demo is one service behind one URL.
 
 from __future__ import annotations
 
-import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
 from .api import agent, alerts, assets, live, meta, replay, rules, zones
 from .config import REPO_ROOT, get_settings
-from .db import close_pool, ping, query_one
-
-
-def _wait_for_db(attempts: int = 12, delay_s: float = 5.0) -> bool:
-    """Private-network DNS and a freshly started Postgres can lag the app by a few seconds."""
-    for i in range(attempts):
-        if ping():
-            return True
-        print(f"[sadd] database not reachable yet ({i + 1}/{attempts}) — retrying in {delay_s:.0f}s", flush=True)
-        time.sleep(delay_s)
-    return False
-
-
-def _seed_if_empty() -> None:
-    try:
-        seeded = query_one("SELECT 1 AS ok FROM replay_meta WHERE id = 1")
-    except Exception:
-        seeded = None  # schema not applied yet
-    if seeded:
-        print("[sadd] database already seeded", flush=True)
-        return
-    print("[sadd] empty database — running seed (SEED_ON_STARTUP=true)", flush=True)
-    from .seed import run as run_seed
-
-    run_seed()
+from .db import close_pool
+from .startup import STATE, start_background
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Bind first, prepare in the background: the port is open from the first second and
+    # /api/health reports whether we are waiting for Postgres, seeding, or ready (see startup.py).
     s = get_settings()
-    ok = _wait_for_db() if s.seed_on_startup else ping()
-    print(f"[sadd] database {'reachable' if ok else 'UNREACHABLE — start it with `make db`'}", flush=True)
-    if ok and s.seed_on_startup:
-        _seed_if_empty()
+    start_background(seed=s.seed_on_startup, db_label=s.database_url.split("@")[-1])
     yield
     close_pool()
 
@@ -61,6 +37,21 @@ app = FastAPI(
     description="Urban flood command & preparedness twin (fictional Doha Flood Operations Center).",
     lifespan=lifespan,
 )
+UNGATED = {"/api/health", "/api/meta", "/api/agent/status"}  # none of these need the database
+
+
+@app.middleware("http")
+async def startup_gate(request: Request, call_next):
+    """Until the twin is ready, data routes answer 503 + the startup phase instead of a stack trace."""
+    path = request.url.path
+    if path.startswith("/api/") and path not in UNGATED and not STATE.ready:
+        return JSONResponse(
+            {"detail": "starting", "startup": STATE.snapshot()}, status_code=503, headers={"Retry-After": "3"}
+        )
+    return await call_next(request)
+
+
+# Added after the gate so CORS headers wrap its 503s too (last added = outermost).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origin_list,

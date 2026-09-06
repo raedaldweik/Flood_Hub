@@ -31,4 +31,5 @@ ENV FRONTEND_DIST=/app/frontend/out \
     PORT=8000
 WORKDIR /app/backend
 EXPOSE 8000
-CMD ["sh", "-c", "uvicorn sadd.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Railway forwards the public domain to the port in PORT; keep it 8000 everywhere (see docs/DEPLOY_RAILWAY.md).
+CMD ["sh", "-c", "uvicorn sadd.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]

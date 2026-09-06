@@ -129,6 +129,7 @@ class Meta(BaseModel):
     app: str
     version: str
     database_ok: bool
+    startup: dict[str, Any]  # phase: starting | waiting_db | seeding | ready | seed_failed
     replay: ReplayMeta | None
     counts: dict[str, int]
     physics: dict[str, Any]

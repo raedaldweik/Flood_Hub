@@ -548,6 +548,10 @@ gmp-map-3d,
   from { width: 0; }
   to   { width: 100%; }
 }
+@keyframes boot-scan {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(400%); }
+}
 
 /* ═══ Scrollbars ═════════════════════════════════════════════════════════ */
 * {

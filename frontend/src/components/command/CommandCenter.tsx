@@ -5,7 +5,8 @@ import { AlertOctagon, Waves } from "lucide-react";
 import { useAlerts, useAssets, useLiveState, useLiveWeather, useMeta, useTimeline, useZones } from "@/hooks/useData";
 import { usePlayback } from "@/hooks/usePlayback";
 import { useKpiNow, useZoneNow } from "@/hooks/useZoneNow";
-import { t } from "@/lib/i18n";
+import type { StartupState } from "@/lib/api";
+import { t, type Lang, type TKey } from "@/lib/i18n";
 import { useUi } from "@/lib/store";
 import { CityMap } from "@/components/map/CityMap";
 import { Legend } from "@/components/map/Legend";
@@ -25,10 +26,12 @@ export function CommandCenter() {
   const setNTicks = useUi((s) => s.setNTicks);
 
   const { data: meta, error: metaError } = useMeta();
-  const { data: zones } = useZones();
-  const { data: timeline } = useTimeline();
-  const { data: alerts } = useAlerts();
-  const { data: assets } = useAssets();
+  // Data hooks stay idle until the backend reports `ready` (a first boot waits for Postgres + seed).
+  const backendReady = meta?.startup?.phase === "ready";
+  const { data: zones } = useZones(backendReady);
+  const { data: timeline } = useTimeline(backendReady);
+  const { data: alerts } = useAlerts(backendReady);
+  const { data: assets } = useAssets(backendReady);
   const { data: liveWeather } = useLiveWeather(mode === "live");
   const { data: liveState } = useLiveState(mode === "live");
 
@@ -64,6 +67,7 @@ export function CommandCenter() {
   const selectedZone = zones?.features.find((z) => z.properties.id === selected);
 
   if (metaError) return <Notice text={t(lang, "backend_down")} />;
+  if (meta && !backendReady) return <StartupScreen startup={meta.startup} lang={lang} />;
   if (meta && !meta.replay) return <Notice text={t(lang, "not_seeded")} />;
 
   return (
@@ -107,6 +111,34 @@ export function CommandCenter() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** First boot on a fresh database: the backend is up but still waiting for Postgres or seeding. */
+function StartupScreen({ startup, lang }: { startup: StartupState; lang: Lang }) {
+  const failed = startup.phase === "seed_failed";
+  const sub = t(lang, `startup_${startup.phase}` as TKey).replace("{n}", String(startup.attempts));
+  return (
+    <div className="grid h-full place-items-center rounded-[18px]" style={{ background: "rgba(7,11,21,0.82)", backdropFilter: "blur(10px)" }}>
+      <div className="flex max-w-lg flex-col items-center gap-5 text-center">
+        <span className={`avatar-ring grid h-16 w-16 place-items-center text-[#06121a] ${failed ? "" : "animate-pulse"}`}>
+          {failed ? <AlertOctagon size={30} strokeWidth={2.4} /> : <Waves size={30} strokeWidth={2.4} />}
+        </span>
+        <div>
+          <div className="display text-[26px] text-fg">{t(lang, failed ? "startup_failed_title" : "startup_title")}</div>
+          <div className="mt-2 text-[12.5px] font-semibold leading-relaxed text-muted">{sub}</div>
+          {failed && startup.detail && (
+            <div className="mt-3 rounded-lg bg-white/[0.06] px-3 py-2 font-mono text-[11px] text-fg-2" dir="ltr">{startup.detail}</div>
+          )}
+        </div>
+        {!failed && (
+          <div className="h-1 w-64 overflow-hidden rounded-full bg-white/[0.08]">
+            <div className="h-full w-1/3 rounded-full" style={{ background: "var(--cyan-grad)", animation: "boot-scan 1.8s ease-in-out infinite" }} />
+          </div>
+        )}
+        <div className="text-[11px] tracking-wide text-muted/80">{t(lang, "startup_elapsed").replace("{s}", String(Math.round(startup.seconds)))}</div>
+      </div>
     </div>
   );
 }

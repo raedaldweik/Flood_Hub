@@ -50,34 +50,50 @@ set it now. Follow the steps in order.
    ```
    DATABASE_URL=postgresql://${{sadd-db.POSTGRES_USER}}:${{sadd-db.POSTGRES_PASSWORD}}@${{sadd-db.RAILWAY_PRIVATE_DOMAIN}}:5432/${{sadd-db.POSTGRES_DB}}
    SEED_ON_STARTUP=true
+   PORT=8000
    NEXT_PUBLIC_GOOGLE_MAPS_KEY=paste-your-maps-key-here
    GEMINI_API_KEY=paste-your-gemini-key-here
    ```
 
    Click **Update Variables**. (If you named the database service something other than
-   `sadd-db`, replace that word in all four `${{...}}` references.)
-3. **Settings** → **Networking** → **Public Networking** → **Generate Domain**. If it asks for
-   a port, type `8000`.
-4. Click **Deploy**. The first boot takes 2–3 minutes: build, wait for the database, seed it
-   from the Open-Meteo archive, healthcheck green.
+   `sadd-db`, replace that word in all four `${{...}}` references.) `PORT=8000` pins the port
+   the app listens on so it always matches the domain you create next.
+3. **Settings** → **Networking** → **Public Networking** → **Generate Domain**. When it asks for
+   a port, type `8000`. The domain card must then read **Port 8000** — if it shows any other
+   number, click the pencil icon on the card and change it to 8000.
+4. Click **Deploy**. The build takes 2–3 minutes. The app answers on its URL as soon as the
+   container starts; on the very first boot it spends about a minute more waiting for the
+   database and seeding the replay, and the page shows that progress live.
 
 ## Part 4 — Check it, then lock the Maps key
 
-1. Open `https://<your-domain>/api/meta` — you should see `"database_ok": true` and counts
-   for zones and alerts.
-2. Open `https://<your-domain>/` — the Command Center. Press play.
-3. Back in Google Cloud → **Credentials** → click your key → **Application restrictions** →
+1. Open `https://<your-domain>/api/health` — you should see `"startup": {"phase": "ready"`.
+   On the first boot it may say `"seeding"` for a minute; refresh until it reads `ready`.
+2. Open `https://<your-domain>/api/meta` — `"database_ok": true` and counts for zones and alerts.
+3. Open `https://<your-domain>/` — the Command Center. Press play.
+4. Back in Google Cloud → **Credentials** → click your key → **Application restrictions** →
    **Websites** → add `https://<your-domain>/*` and `http://localhost:3000/*` → Save.
    Then **API restrictions** → restrict to *Maps JavaScript API* and *Map Tiles API* → Save.
    If the map goes blank after this, the website entry does not match your domain exactly.
 
 ## If something is off
 
+- **Railway's own page says "Application failed to respond":** nothing was listening on the
+  port Railway forwards to. Check two things on `sadd-app`:
+  1. **Settings → Networking**: the domain card must read **Port 8000**, and **Variables** must
+     contain `PORT=8000`. Fix either, then Deploy.
+  2. **Deployments → latest → View logs**: the last lines should include
+     `Uvicorn running on http://0.0.0.0:8000` (that number must be 8000) and
+     `[sadd] startup: ready`. If instead it repeats `[sadd] startup: waiting_db`, the app is up
+     but cannot reach the database — check `DATABASE_URL` and that `sadd-db` is Online.
+     If it shows `[sadd] startup: seed_failed`, the traceback right above it says why.
+- **The page says "Warming up the twin":** normal on the first boot — the database is being
+  seeded from the Open-Meteo archive. It clears by itself in about a minute.
 - **Map shows the 2D fallback banner:** the Maps key was empty when Railway built the image.
   Set it, then Deployments → ⋮ → **Redeploy** (the key is baked in at build time).
 - **"Database not seeded" or "Backend unreachable":** open `sadd-app` → Deployments → View
   logs. If it says the database is not reachable, check `DATABASE_URL` references the exact
   database service name, and that `sadd-db` is Online.
 - **Re-seed from scratch:** delete the volume on `sadd-db` and redeploy both services.
-- Nothing else needs setting. Do not add `PORT`, `NEXT_PUBLIC_API_BASE`, `CORS_ORIGINS`,
+- Nothing else needs setting. Do not add `NEXT_PUBLIC_API_BASE`, `CORS_ORIGINS`,
   `FRONTEND_DIST` or `SADD_DATA_DIR`.

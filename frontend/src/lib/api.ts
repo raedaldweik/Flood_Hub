@@ -133,10 +133,20 @@ export interface ZoneExplanation {
   inputs: Record<string, number | boolean>;
 }
 
+export type StartupPhase = "starting" | "waiting_db" | "seeding" | "ready" | "seed_failed";
+/** Reported by the backend while it waits for Postgres and seeds the replay in the background. */
+export interface StartupState {
+  phase: StartupPhase;
+  detail: string;
+  attempts: number;
+  seconds: number;
+}
+
 export interface Meta {
   app: string;
   version: string;
   database_ok: boolean;
+  startup: StartupState;
   replay: ReplayMeta | null;
   counts: Record<string, number>;
   physics: {
