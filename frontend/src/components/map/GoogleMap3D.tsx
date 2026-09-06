@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { ZoneFeature } from "@/lib/api";
-import { ESTABLISHING, zoneCamera, type Camera } from "@/lib/camera";
+import { ESTABLISHING, SKYLINE, zoneCamera, type Camera } from "@/lib/camera";
 import { loadMaps3D } from "@/lib/googleMaps";
 import { quantiseRisk, riskColor, riskColorAlpha } from "@/lib/risk";
 import type { ZoneNow } from "@/hooks/useZoneNow";
@@ -15,6 +15,7 @@ interface Props {
   onSelect: (id: string) => void;
   flyRequest: number;
   resetRequest: number;
+  skylineRequest: number;
   onReady: () => void;
   onError: (message: string) => void;
 }
@@ -30,7 +31,7 @@ function toCamera(c: Camera): google.maps.maps3d.CameraOptions {
  * Zones are draped Polygon3DInteractiveElements coloured by risk; the camera drifts slowly
  * around the establishing shot and flies to a zone on request.
  */
-export function GoogleMap3D({ apiKey, zones, states, selected, onSelect, flyRequest, resetRequest, onReady, onError }: Props) {
+export function GoogleMap3D({ apiKey, zones, states, selected, onSelect, flyRequest, resetRequest, skylineRequest, onReady, onError }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.maps3d.Map3DElement | null>(null);
   const polys = useRef<Map<string, Polygon>>(new Map());
@@ -143,6 +144,15 @@ export function GoogleMap3D({ apiKey, zones, states, selected, onSelect, flyRequ
     map.stopCameraAnimation();
     map.flyCameraTo({ endCamera: toCamera(zoneCamera(z.properties.centroid, z.properties.area_km2)), durationMillis: 2600 });
   }, [flyRequest, selected]);
+
+  // Dive to the West Bay skyline — the shot that proves the mesh is photorealistic 3D.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !skylineRequest) return;
+    drifting.current = false;
+    map.stopCameraAnimation();
+    map.flyCameraTo({ endCamera: toCamera(SKYLINE), durationMillis: 3400 });
+  }, [skylineRequest]);
 
   // Return to the establishing shot and resume the drift.
   useEffect(() => {

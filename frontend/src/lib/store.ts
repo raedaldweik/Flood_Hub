@@ -34,6 +34,8 @@ interface UiState {
   requestFly: (id: string) => void;
   resetRequest: number;
   requestReset: () => void;
+  skylineRequest: number;
+  requestSkyline: () => void;
 
   rafidOpen: boolean;
   setRafidOpen: (o: boolean) => void;
@@ -70,6 +72,8 @@ export const useUi = create<UiState>((set) => ({
   requestFly: (id) => set((s) => ({ selectedZone: id, flyRequest: s.flyRequest + 1 })),
   resetRequest: 0,
   requestReset: () => set((s) => ({ selectedZone: null, resetRequest: s.resetRequest + 1 })),
+  skylineRequest: 0,
+  requestSkyline: () => set((s) => ({ selectedZone: null, skylineRequest: s.skylineRequest + 1 })),
 
   rafidOpen: true,
   setRafidOpen: (rafidOpen) => set({ rafidOpen }),

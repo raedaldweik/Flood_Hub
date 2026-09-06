@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import maplibregl, { type Map as MlMap, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { ZoneFeature } from "@/lib/api";
-import { FALLBACK_FRAME as FRAME } from "@/lib/camera";
+import { FALLBACK_FRAME as FRAME, SKYLINE_FRAME } from "@/lib/camera";
 import type { Lang } from "@/lib/i18n";
 import { BAND_COLORS, bandOf, quantiseRisk, riskColor } from "@/lib/risk";
 import type { ZoneNow } from "@/hooks/useZoneNow";
@@ -16,6 +16,7 @@ interface Props {
   onSelect: (id: string) => void;
   flyRequest: number;
   resetRequest: number;
+  skylineRequest: number;
   lang: Lang;
   onBasemap?: (ok: boolean) => void;
 }
@@ -53,7 +54,7 @@ async function loadStyle(): Promise<{ style: StyleSpecification; online: boolean
  * library fails: dark vector basemap with extruded buildings, glowing risk zones that pulse when
  * red, and HUD labels with live scores. Same data, same colours, same interactions as the 3D map.
  */
-export function FallbackMap({ zones, states, selected, onSelect, flyRequest, resetRequest, lang, onBasemap }: Props) {
+export function FallbackMap({ zones, states, selected, onSelect, flyRequest, resetRequest, skylineRequest, lang, onBasemap }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const markers = useRef<Map<string, maplibregl.Marker>>(new Map());
@@ -242,6 +243,13 @@ export function FallbackMap({ zones, states, selected, onSelect, flyRequest, res
     if (!map || !resetRequest) return;
     map.flyTo({ center: [FRAME.lng, FRAME.lat], zoom: FRAME.zoom, pitch: 55, bearing: -15, duration: 2400, essential: true });
   }, [resetRequest]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !skylineRequest) return;
+    const f = SKYLINE_FRAME;
+    map.flyTo({ center: [f.lng, f.lat], zoom: f.zoom, pitch: f.pitch, bearing: f.bearing, duration: 3000, essential: true });
+  }, [skylineRequest]);
 
   return <div ref={container} className="map-fill backdrop isolate" />;
 }

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import clsx from "clsx";
-import { Gauge, Pause, Play, Radio, RotateCcw, SkipBack } from "lucide-react";
+import { Building2, Gauge, Pause, Play, Radio, RotateCcw, SkipBack } from "lucide-react";
 import type { Alert, LiveWeather, Timeline } from "@/lib/api";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { t } from "@/lib/i18n";
@@ -29,6 +29,7 @@ export function TimeControls({ timeline, live, alerts }: Props) {
   const speed = useUi((s) => s.speed);
   const setSpeed = useUi((s) => s.setSpeed);
   const requestReset = useUi((s) => s.requestReset);
+  const requestSkyline = useUi((s) => s.requestSkyline);
 
   const n = timeline?.meta.n_ticks ?? 1;
   const den = Math.max(1, n - 1);
@@ -81,6 +82,10 @@ export function TimeControls({ timeline, live, alerts }: Props) {
             <span className="text-[14px] font-extrabold">{t(lang, "time_today")} · {fmtDate(new Date(), lang)}</span>
           </div>
         )}
+        <button onClick={requestSkyline} className="btn-ghost" title={t(lang, "time_skyline")}>
+          <Building2 size={13} />
+          <span className="hidden 2xl:inline">{t(lang, "time_skyline")}</span>
+        </button>
         <button onClick={requestReset} className="btn-ghost" title={t(lang, "time_reset")}>
           <RotateCcw size={13} />
           <span className="hidden 2xl:inline">{t(lang, "time_reset")}</span>

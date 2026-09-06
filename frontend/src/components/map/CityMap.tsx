@@ -25,6 +25,7 @@ export function CityMap({ zones, states }: Props) {
   const requestFly = useUi((s) => s.requestFly);
   const flyRequest = useUi((s) => s.flyRequest);
   const resetRequest = useUi((s) => s.resetRequest);
+  const skylineRequest = useUi((s) => s.skylineRequest);
 
   const [threeD, setThreeD] = useState<"loading" | "ready" | "failed">(MAPS_KEY ? "loading" : "failed");
   const [failure, setFailure] = useState<string | null>(MAPS_KEY ? null : "missing-key");
@@ -43,6 +44,7 @@ export function CityMap({ zones, states }: Props) {
           onSelect={requestFly}
           flyRequest={flyRequest}
           resetRequest={resetRequest}
+          skylineRequest={skylineRequest}
           onReady={() => setThreeD("ready")}
           onError={(m) => {
             console.warn("[sadd] 3D map unavailable:", m);
@@ -58,6 +60,7 @@ export function CityMap({ zones, states }: Props) {
           onSelect={requestFly}
           flyRequest={flyRequest}
           resetRequest={resetRequest}
+          skylineRequest={skylineRequest}
           lang={lang}
           onBasemap={setBasemap}
         />
