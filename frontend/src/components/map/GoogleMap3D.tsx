@@ -164,8 +164,9 @@ export function GoogleMap3D({
             strokeColor: TOWER_GLASS_STROKE,
             strokeWidth: 1,
             drawsOccludedSegments: false,
-            outerCoordinates: ring.map(([lng, lat]) => ({ lat: lat!, lng: lng!, altitude: b.properties.height_m })),
           });
+          // The runtime deprecates `outerCoordinates` in favour of `path` (the typings say the reverse).
+          el.path = ring.map(([lng, lat]) => ({ lat: lat!, lng: lng!, altitude: b.properties.height_m }));
           towerMap.set(b.properties.osm_id, { el, zone: b.properties.zone_id });
           if (showTowersRef.current) map.append(el);
         }
