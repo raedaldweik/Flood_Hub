@@ -12,6 +12,11 @@ declare global {
 }
 
 export const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ?? "";
+/**
+ * Map ID for the vector engine (3D buildings, tilt, rotation). Google's public DEMO_MAP_ID works for
+ * any key; a project Map ID lets you attach a cloud-styled dark theme (docs/DEPLOY_RAILWAY.md).
+ */
+export const MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || "DEMO_MAP_ID";
 
 function bootstrap(key: string): Promise<void> {
   if (window.google?.maps) return Promise.resolve();
@@ -32,4 +37,9 @@ function bootstrap(key: string): Promise<void> {
 export async function loadMaps3D(key: string): Promise<google.maps.Maps3DLibrary> {
   await bootstrap(key);
   return (await google.maps.importLibrary("maps3d")) as google.maps.Maps3DLibrary;
+}
+
+export async function loadMapsLib(key: string): Promise<google.maps.MapsLibrary> {
+  await bootstrap(key);
+  return (await google.maps.importLibrary("maps")) as google.maps.MapsLibrary;
 }

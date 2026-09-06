@@ -1,0 +1,267 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import type { BuildingFeature, ZoneFeature } from "@/lib/api";
+import { CITY_CENTER, VECTOR_BAY, VECTOR_ESTABLISHING, vectorZoneView, type VectorView } from "@/lib/camera";
+import { loadMapsLib } from "@/lib/googleMaps";
+import { bandOf, quantiseRisk, riskColor } from "@/lib/risk";
+import type { ZoneNow } from "@/hooks/useZoneNow";
+import { createTowersOverlay, type TowersOverlay } from "./towersOverlay";
+
+interface Props {
+  apiKey: string;
+  mapId: string;
+  zones: ZoneFeature[];
+  states: Record<string, ZoneNow>;
+  selected: string | null;
+  onSelect: (id: string) => void;
+  flyRequest: number;
+  resetRequest: number;
+  skylineRequest: number;
+  buildings: BuildingFeature[];
+  showTowers: boolean;
+  onReady: () => void;
+  onError: (message: string) => void;
+}
+
+const DRIFT_DEG_PER_S = 0.6;
+
+const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const lerpHeading = (a: number, b: number, t: number) => {
+  const d = ((b - a + 540) % 360) - 180;
+  return (a + d * t + 360) % 360;
+};
+
+/**
+ * Google's vector map (dark scheme, tilt + rotation, Google's own 3D buildings at district zoom)
+ * with the zones as ground polygons and the OpenStreetMap towers extruded through a WebGL overlay.
+ * Camera moves are our own eased tweens over `moveCamera`, so every transition is cinematic.
+ */
+export function GoogleVectorMap({
+  apiKey, mapId, zones, states, selected, onSelect, flyRequest, resetRequest, skylineRequest, buildings, showTowers, onReady, onError,
+}: Props) {
+  const container = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const libRef = useRef<google.maps.MapsLibrary | null>(null);
+  const polys = useRef<Map<string, google.maps.Polygon>>(new Map());
+  const lastColor = useRef<Map<string, string>>(new Map());
+  const towersRef = useRef<TowersOverlay | null>(null);
+  const tweenRaf = useRef(0);
+  const driftRaf = useRef(0);
+  const drifting = useRef(false);
+  const statesRef = useRef(states);
+  statesRef.current = states;
+  const zonesRef = useRef(zones);
+  zonesRef.current = zones;
+  const buildingsRef = useRef(buildings);
+  buildingsRef.current = buildings;
+  const showTowersRef = useRef(showTowers);
+  showTowersRef.current = showTowers;
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+  const syncRef = useRef<() => void>(() => {});
+
+  const paintTowers = () => {
+    towersRef.current?.paint((zone) => bandOf(statesRef.current[zone]?.risk ?? 0));
+  };
+
+  const stopDrift = () => {
+    drifting.current = false;
+    cancelAnimationFrame(driftRaf.current);
+  };
+
+  const startDrift = () => {
+    const map = mapRef.current;
+    if (!map || drifting.current) return;
+    drifting.current = true;
+    let last = performance.now();
+    const step = (now: number) => {
+      if (!drifting.current) return;
+      const dt = (now - last) / 1000;
+      last = now;
+      map.moveCamera({ heading: ((map.getHeading() ?? 0) + DRIFT_DEG_PER_S * dt) % 360 });
+      driftRaf.current = requestAnimationFrame(step);
+    };
+    driftRaf.current = requestAnimationFrame(step);
+  };
+
+  const flyTo = (view: VectorView, ms: number, onDone?: () => void) => {
+    const map = mapRef.current;
+    if (!map) return;
+    stopDrift();
+    cancelAnimationFrame(tweenRaf.current);
+    const c = map.getCenter();
+    const from = {
+      lat: c?.lat() ?? view.lat, lng: c?.lng() ?? view.lng,
+      zoom: map.getZoom() ?? view.zoom, tilt: map.getTilt() ?? view.tilt, heading: map.getHeading() ?? view.heading,
+    };
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const t = easeInOut(Math.min(1, (now - t0) / ms));
+      map.moveCamera({
+        center: { lat: lerp(from.lat, view.lat, t), lng: lerp(from.lng, view.lng, t) },
+        zoom: lerp(from.zoom, view.zoom, t),
+        tilt: lerp(from.tilt, view.tilt, t),
+        heading: lerpHeading(from.heading, view.heading, t),
+      });
+      if (t < 1) tweenRaf.current = requestAnimationFrame(step);
+      else onDone?.();
+    };
+    tweenRaf.current = requestAnimationFrame(step);
+  };
+
+  // Mount once.
+  useEffect(() => {
+    let cancelled = false;
+    const el = container.current;
+    if (!el) return;
+    const polyMap = polys.current;
+    const lastColorMap = lastColor.current;
+
+    (async () => {
+      try {
+        const lib = await loadMapsLib(apiKey);
+        if (cancelled) return;
+        const v = VECTOR_ESTABLISHING;
+        const map = new lib.Map(el, {
+          mapId,
+          renderingType: "VECTOR",
+          colorScheme: "DARK",
+          center: { lat: v.lat, lng: v.lng },
+          zoom: v.zoom,
+          tilt: v.tilt,
+          heading: v.heading,
+          disableDefaultUI: true,
+          gestureHandling: "greedy",
+          isFractionalZoomEnabled: true,
+          headingInteractionEnabled: true,
+          tiltInteractionEnabled: true,
+          clickableIcons: false,
+          keyboardShortcuts: false,
+          backgroundColor: "#070b15",
+        });
+        mapRef.current = map;
+        libRef.current = lib;
+
+        // 3D buildings need vector rendering; RASTER means the Map ID (or the device) cannot do it.
+        map.addListener("renderingtype_changed", () => {
+          if ((map.getRenderingType() as string) === "RASTER") onError("vector rendering unavailable — check NEXT_PUBLIC_GOOGLE_MAP_ID");
+        });
+        const first = map.addListener("idle", () => {
+          first.remove();
+          if (cancelled) return;
+          onReady();
+          startDrift();
+        });
+
+        const towers = createTowersOverlay(lib, CITY_CENTER);
+        towers.overlay.setMap(map);
+        towersRef.current = towers;
+        if (buildingsRef.current.length) towers.setBuildings(buildingsRef.current);
+        towers.setVisible(showTowersRef.current);
+
+        syncPolygons();
+        paintTowers();
+        el.addEventListener("pointerdown", stopDrift);
+        el.addEventListener("wheel", stopDrift, { passive: true });
+      } catch (err) {
+        onError(err instanceof Error ? err.message : String(err));
+      }
+    })();
+
+    function syncPolygons() {
+      const map = mapRef.current;
+      const lib = libRef.current;
+      if (!map || !lib) return;
+      for (const z of zonesRef.current) {
+        if (polyMap.has(z.properties.id)) continue;
+        const poly = new lib.Polygon({
+          paths: z.geometry.coordinates[0].map(([lng, lat]) => ({ lat, lng })),
+          fillColor: "#22c55e",
+          fillOpacity: 0.3,
+          strokeColor: "#22c55e",
+          strokeOpacity: 0.95,
+          strokeWeight: 2,
+          clickable: true,
+          zIndex: 1,
+          map,
+        });
+        poly.addListener("click", () => onSelectRef.current(z.properties.id));
+        polyMap.set(z.properties.id, poly);
+      }
+      lastColorMap.clear();
+    }
+    syncRef.current = syncPolygons;
+
+    return () => {
+      cancelled = true;
+      stopDrift();
+      cancelAnimationFrame(tweenRaf.current);
+      towersRef.current?.dispose();
+      towersRef.current = null;
+      for (const p of polyMap.values()) p.setMap(null);
+      polyMap.clear();
+      el.removeEventListener("pointerdown", stopDrift);
+      el.removeEventListener("wheel", stopDrift);
+      el.replaceChildren();
+      mapRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKey, mapId]);
+
+  // Zones can arrive after the map is ready.
+  useEffect(() => {
+    syncRef.current();
+  }, [zones]);
+
+  // Towers arrive once the backend reports ready.
+  useEffect(() => {
+    towersRef.current?.setBuildings(buildings);
+    paintTowers();
+  }, [buildings]);
+
+  useEffect(() => {
+    towersRef.current?.setVisible(showTowers);
+  }, [showTowers]);
+
+  // Recolour zones + towers when risk moves (quantised so 20× playback stays cheap).
+  useEffect(() => {
+    for (const [id, poly] of polys.current) {
+      const q = quantiseRisk(states[id]?.risk ?? 0);
+      const isSel = selected === id;
+      const key = `${q}|${isSel ? 1 : 0}`;
+      if (lastColor.current.get(id) === key) continue;
+      lastColor.current.set(id, key);
+      poly.setOptions({
+        fillColor: riskColor(q),
+        fillOpacity: isSel ? 0.48 : q >= 40 ? 0.36 : 0.26,
+        strokeColor: isSel ? "#ffffff" : riskColor(q),
+        strokeWeight: isSel ? 3.5 : 2,
+      });
+    }
+    paintTowers();
+  }, [states, selected]);
+
+  // Fly to the selected zone.
+  useEffect(() => {
+    if (!flyRequest || !selected) return;
+    const z = zonesRef.current.find((f) => f.properties.id === selected);
+    if (z) flyTo(vectorZoneView(z.properties.centroid, z.properties.area_km2), 2600);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flyRequest, selected]);
+
+  // Bay view: West Bay towers, close enough for Google's own 3D buildings.
+  useEffect(() => {
+    if (skylineRequest) flyTo(VECTOR_BAY, 3400);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skylineRequest]);
+
+  // Back to the establishing shot, then resume the slow drift.
+  useEffect(() => {
+    if (resetRequest) flyTo(VECTOR_ESTABLISHING, 2600, startDrift);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetRequest]);
+
+  return <div ref={container} className="map-fill isolate" />;
+}

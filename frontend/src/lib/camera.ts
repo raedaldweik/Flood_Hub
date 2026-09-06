@@ -31,3 +31,25 @@ export function zoneCamera(centroid: [number, number], areaKm2: number, heading 
   const range = Math.min(9000, Math.max(2800, Math.sqrt(areaKm2) * 1900));
   return { lat: centroid[1], lng: centroid[0], altitude: 0, range, tilt: 64, heading };
 }
+
+/* ── Vector engine (google.maps.Map, tilt/heading/zoom) ─────────────────────────────────────── */
+
+export interface VectorView {
+  lat: number;
+  lng: number;
+  zoom: number;
+  tilt: number;
+  heading: number;
+}
+
+/** Establishing shot on the vector map: whole city, tilted, looking north over the bay. */
+export const VECTOR_ESTABLISHING: VectorView = { lat: 25.292, lng: 51.53, zoom: 12.35, tilt: 62, heading: 20 };
+
+/** Bay view: West Bay towers from the south-east — close enough for Google's own 3D buildings. */
+export const VECTOR_BAY: VectorView = { lat: 25.3185, lng: 51.5295, zoom: 15.3, tilt: 67.5, heading: 330 };
+
+/** Frame a zone from its area (km²): bigger districts sit further out. */
+export function vectorZoneView(centroid: [number, number], areaKm2: number, heading = 25): VectorView {
+  const zoom = Math.min(15.8, Math.max(13.5, 15.2 - Math.log2(Math.sqrt(Math.max(areaKm2, 0.25)) / 1.6)));
+  return { lat: centroid[1], lng: centroid[0], zoom, tilt: 65, heading };
+}

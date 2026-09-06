@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { Box, Building2, WifiOff } from "lucide-react";
 import type { ZoneFeature } from "@/lib/api";
-import { useBuildings } from "@/hooks/useData";
-import { MAPS_KEY } from "@/lib/googleMaps";
+import { MAP_ID, MAPS_KEY } from "@/lib/googleMaps";
 import { t } from "@/lib/i18n";
 import { useUi } from "@/lib/store";
+import { useBuildings } from "@/hooks/useData";
 import type { ZoneNow } from "@/hooks/useZoneNow";
+import { GoogleVectorMap } from "./GoogleVectorMap";
 import { GoogleMap3D } from "./GoogleMap3D";
 import { FallbackMap } from "./FallbackMap";
 
@@ -17,9 +18,13 @@ interface Props {
 }
 
 /**
- * Picks the renderer: photorealistic 3D when a Google Maps key is present and loads;
- * the cinematic MapLibre fallback otherwise — with an honest banner saying why (CLAUDE.md §11).
+ * Engine chain, each step honest about why it stepped down (CLAUDE.md §11):
+ *   vector   — Google's dark vector map with its own 3D buildings + our risk-lit towers (default)
+ *   3d       — Google's photorealistic Map3DElement (imagery on terrain; Qatar has no mesh yet)
+ *   fallback — cinematic MapLibre map, for a missing key or a blocked Google endpoint
  */
+type Engine = "vector" | "3d" | "fallback";
+
 export function CityMap({ zones, states }: Props) {
   const lang = useUi((s) => s.lang);
   const selected = useUi((s) => s.selectedZone);
@@ -30,37 +35,42 @@ export function CityMap({ zones, states }: Props) {
   const setTowers = useUi((s) => s.setTowers);
   const skylineRequest = useUi((s) => s.skylineRequest);
 
-  const [threeD, setThreeD] = useState<"loading" | "ready" | "failed">(MAPS_KEY ? "loading" : "failed");
+  const [engine, setEngine] = useState<Engine>(MAPS_KEY ? "vector" : "fallback");
+  const [ready, setReady] = useState(false);
   const [failure, setFailure] = useState<string | null>(MAPS_KEY ? null : "missing-key");
   const [basemap, setBasemap] = useState<boolean | null>(null);
 
-  const use3D = Boolean(MAPS_KEY) && threeD !== "failed";
-  // Risk-lit towers (OpenStreetMap footprints, extruded on the Google map) — only once 3D is up.
-  const { data: buildings } = useBuildings(use3D && threeD === "ready");
+  const google = engine !== "fallback";
+  // Risk-lit towers (OpenStreetMap footprints) — fetched once a Google engine is up.
+  const { data: buildings } = useBuildings(google && ready);
   const towerCount = buildings?.features.length ?? 0;
+
+  const stepDown = (from: Engine, message: string) => {
+    console.warn(`[sadd] ${from} map unavailable:`, message);
+    setFailure(message);
+    setReady(false);
+    setEngine(from === "vector" ? "3d" : "fallback");
+  };
+
+  const shared = {
+    apiKey: MAPS_KEY,
+    zones,
+    states,
+    selected,
+    onSelect: requestFly,
+    flyRequest,
+    resetRequest,
+    skylineRequest,
+    buildings: buildings?.features ?? [],
+    showTowers: towers,
+    onReady: () => setReady(true),
+  };
 
   return (
     <div className="absolute inset-0 isolate overflow-hidden">
-      {use3D ? (
-        <GoogleMap3D
-          apiKey={MAPS_KEY}
-          zones={zones}
-          states={states}
-          selected={selected}
-          onSelect={requestFly}
-          flyRequest={flyRequest}
-          resetRequest={resetRequest}
-          skylineRequest={skylineRequest}
-          buildings={buildings?.features ?? []}
-          showTowers={towers}
-          onReady={() => setThreeD("ready")}
-          onError={(m) => {
-            console.warn("[sadd] 3D map unavailable:", m);
-            setFailure(m);
-            setThreeD("failed");
-          }}
-        />
-      ) : (
+      {engine === "vector" && <GoogleVectorMap {...shared} mapId={MAP_ID} onError={(m) => stepDown("vector", m)} />}
+      {engine === "3d" && <GoogleMap3D {...shared} onError={(m) => stepDown("3d", m)} />}
+      {engine === "fallback" && (
         <FallbackMap
           zones={zones}
           states={states}
@@ -75,7 +85,7 @@ export function CityMap({ zones, states }: Props) {
       )}
       <div className="map-vignette" />
 
-      {use3D && threeD === "loading" && (
+      {google && !ready && (
         <div className="backdrop absolute inset-0 grid place-items-center">
           <div className="flex items-center gap-3 text-[13px] font-semibold text-fg-2">
             <span className="h-2 w-2 animate-ping rounded-full bg-accent" />
@@ -84,29 +94,30 @@ export function CityMap({ zones, states }: Props) {
         </div>
       )}
 
-      {use3D && threeD === "ready" && (
+      {google && ready && (
         <div className="pointer-events-none absolute bottom-[152px] end-3.5 z-10 flex flex-col items-end gap-2">
           {towerCount > 0 && (
             <button
               type="button"
               onClick={() => setTowers(!towers)}
-              className="status-pill pointer-events-auto text-fg-2"
-              aria-pressed={towers}
-              title={t(lang, "map_towers")}
+              className="status-pill pointer-events-auto text-fg-2 transition-colors hover:text-fg"
+              title={t(lang, "map_towers_src")}
             >
               <Building2 size={13} className={towers ? "text-accent" : "text-muted"} />
               {t(lang, "map_towers")} · {towerCount} · {t(lang, "map_towers_src")}
-              <span className={`h-1.5 w-1.5 rounded-full ${towers ? "bg-accent" : "bg-white/25"}`} />
+              <span className={`ms-1 h-1.5 w-1.5 rounded-full ${towers ? "bg-accent" : "bg-white/30"}`} />
             </button>
           )}
-          <div className="status-pill text-fg-2">
-            <Box size={13} className="text-accent" />
-            {t(lang, "map_3d_no_mesh")}
-          </div>
+          {engine === "3d" && (
+            <div className="status-pill text-fg-2">
+              <Box size={13} className="text-accent" />
+              {t(lang, "map_3d_no_mesh")}
+            </div>
+          )}
         </div>
       )}
 
-      {!use3D && (
+      {engine === "fallback" && (
         <div className="pointer-events-none absolute bottom-[152px] end-3.5 z-10 flex flex-col items-end gap-2">
           <div className="status-pill text-fg-2">
             <Box size={13} className="text-accent" />
