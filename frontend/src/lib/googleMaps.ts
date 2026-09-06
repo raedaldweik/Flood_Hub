@@ -17,6 +17,12 @@ export const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ?? "";
  * any key; a project Map ID lets you attach a cloud-styled dark theme (docs/DEPLOY_RAILWAY.md).
  */
 export const MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || "DEMO_MAP_ID";
+/**
+ * Which Google engine starts first. "vector" = dark vector map with 3D buildings + three.js towers;
+ * "3d" = photorealistic Map3DElement. The vector engine flips to default once it is verified on a
+ * live key; until then it is opt-in so a deploy never changes the demo unseen.
+ */
+export const MAP_ENGINE: "vector" | "3d" = process.env.NEXT_PUBLIC_MAP_ENGINE === "vector" ? "vector" : "3d";
 
 function bootstrap(key: string): Promise<void> {
   if (window.google?.maps) return Promise.resolve();

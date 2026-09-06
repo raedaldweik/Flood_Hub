@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Box, Building2, WifiOff } from "lucide-react";
 import type { ZoneFeature } from "@/lib/api";
-import { MAP_ID, MAPS_KEY } from "@/lib/googleMaps";
+import { MAP_ENGINE, MAP_ID, MAPS_KEY } from "@/lib/googleMaps";
 import { t } from "@/lib/i18n";
 import { useUi } from "@/lib/store";
 import { useBuildings } from "@/hooks/useData";
@@ -35,7 +35,7 @@ export function CityMap({ zones, states }: Props) {
   const setTowers = useUi((s) => s.setTowers);
   const skylineRequest = useUi((s) => s.skylineRequest);
 
-  const [engine, setEngine] = useState<Engine>(MAPS_KEY ? "vector" : "fallback");
+  const [engine, setEngine] = useState<Engine>(MAPS_KEY ? MAP_ENGINE : "fallback");
   const [ready, setReady] = useState(false);
   const [failure, setFailure] = useState<string | null>(MAPS_KEY ? null : "missing-key");
   const [basemap, setBasemap] = useState<boolean | null>(null);
