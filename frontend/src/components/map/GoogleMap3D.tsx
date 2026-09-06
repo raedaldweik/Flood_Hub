@@ -27,8 +27,8 @@ type Polygon = google.maps.maps3d.Polygon3DElement;
 type Tower = { el: Polygon; zone: string | null };
 
 // Calm glass for towers in normal zones; risk colours take over from the yellow band up.
-const TOWER_GLASS_FILL = "rgba(125, 211, 252, 0.30)";
-const TOWER_GLASS_STROKE = "rgba(186, 230, 253, 0.55)";
+const TOWER_GLASS_FILL = "rgba(125, 211, 252, 0.14)";
+const TOWER_GLASS_STROKE = "rgba(186, 230, 253, 0.32)";
 const TOWER_BATCH = 40; // polygons created per frame so a 400-tower skyline never freezes one
 
 function toCamera(c: Camera): google.maps.maps3d.CameraOptions {

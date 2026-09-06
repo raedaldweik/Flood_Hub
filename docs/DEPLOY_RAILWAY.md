@@ -98,10 +98,13 @@ set it now. Follow the steps in order.
   change on the day Google adds Qatar. If you *do* see an error mentioning "Map Tiles API"
   in F12 → Console, that API is disabled or blocked by the key's restrictions — fix that
   first.
-- **Switching to the vector map (dark Google map with grey 3D buildings + coloured towers):** add
-  `NEXT_PUBLIC_MAP_ENGINE=vector` to the `sadd-app` variables and Deploy. It is a build-time
-  value, so a redeploy is required. Remove the variable to go back to the imagery map. A project
-  Map ID in `NEXT_PUBLIC_GOOGLE_MAP_ID` is optional (Google's `DEMO_MAP_ID` is used otherwise).
+- **Which map engine is running:** the pill bottom-right of the map says either
+  "Google vector map · dark · 3D buildings" (the default: dark map, Google's grey 3D buildings,
+  coloured towers) or "Google 3D · imagery on terrain" (the satellite map). To force the
+  satellite map, add `NEXT_PUBLIC_MAP_ENGINE=3d` to the `sadd-app` variables and Deploy — it
+  is a build-time value. A project Map ID in `NEXT_PUBLIC_GOOGLE_MAP_ID` is optional (Google's
+  `DEMO_MAP_ID` is used otherwise). If the vector map cannot start on a device, the app steps
+  down to the satellite map by itself and says so in the browser console.
 - **No towers on the 3D map:** the building volume is OpenStreetMap data fetched during the
   Docker build (`[buildings] wrote N towers` in the build log). If that line says `failed`,
   the Overpass API was busy — Deployments → ⋮ → **Redeploy** to fetch again. The pill on the

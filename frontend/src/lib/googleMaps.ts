@@ -18,11 +18,10 @@ export const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ?? "";
  */
 export const MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || "DEMO_MAP_ID";
 /**
- * Which Google engine starts first. "vector" = dark vector map with 3D buildings + three.js towers;
- * "3d" = photorealistic Map3DElement. The vector engine flips to default once it is verified on a
- * live key; until then it is opt-in so a deploy never changes the demo unseen.
+ * Which Google engine starts first. "vector" (default) = dark vector map with Google's 3D
+ * buildings + the three.js towers; "3d" = photorealistic Map3DElement, imagery on terrain.
  */
-export const MAP_ENGINE: "vector" | "3d" = process.env.NEXT_PUBLIC_MAP_ENGINE === "vector" ? "vector" : "3d";
+export const MAP_ENGINE: "vector" | "3d" = process.env.NEXT_PUBLIC_MAP_ENGINE === "3d" ? "3d" : "vector";
 
 function bootstrap(key: string): Promise<void> {
   if (window.google?.maps) return Promise.resolve();

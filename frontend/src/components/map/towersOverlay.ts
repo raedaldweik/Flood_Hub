@@ -13,27 +13,31 @@ import type { BuildingFeature, Band } from "@/lib/api";
 
 const M_PER_DEG_LAT = 111_320;
 
-function material(hex: number, opacity: number, glow: number): THREE.MeshStandardMaterial {
+function material(hex: number, emissive: number, glow: number, opacity = 1): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     color: hex,
-    emissive: hex,
+    emissive,
     emissiveIntensity: glow,
     transparent: opacity < 1,
     opacity,
-    roughness: 0.35,
-    metalness: 0.15,
+    roughness: 0.55,
+    metalness: 0.1,
     side: THREE.DoubleSide,
   });
 }
 
-/** Calm glass when the zone is normal; the zone's risk colour from the yellow band up. */
+/**
+ * Normal zones: solid slate buildings with a faint cyan lift, so they read as part of the dark
+ * basemap rather than as boxes on top of it. From the yellow band up the zone's risk colour
+ * takes over and the tower glows.
+ */
 const MATERIALS: Record<Band, THREE.MeshStandardMaterial> = {
-  green: material(0x38bdf8, 0.55, 0.12),
-  yellow: material(0xeab308, 0.88, 0.28),
-  orange: material(0xf97316, 0.9, 0.34),
-  red: material(0xef4444, 0.94, 0.42),
+  green: material(0x3b4a5e, 0x0ea5e9, 0.08),
+  yellow: material(0xca9a06, 0xeab308, 0.45),
+  orange: material(0xd8641a, 0xf97316, 0.5),
+  red: material(0xd33c3c, 0xef4444, 0.6),
 };
-const OUTSIDE = material(0x94a3b8, 0.4, 0.05); // towers that stand in no zone
+const OUTSIDE = material(0x334155, 0x000000, 0); // towers that stand in no zone
 
 export interface TowersOverlay {
   overlay: google.maps.WebGLOverlayView;
@@ -117,7 +121,7 @@ export function createTowersOverlay(lib: google.maps.MapsLibrary, anchor: { lat:
       const merged = mergeGeometries(edgeGeoms, false);
       for (const g of edgeGeoms) g.dispose();
       if (merged) {
-        edges = new THREE.LineSegments(merged, new THREE.LineBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.28 }));
+        edges = new THREE.LineSegments(merged, new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.22 }));
         group.add(edges);
       }
     }

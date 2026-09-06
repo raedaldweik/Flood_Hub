@@ -46,7 +46,7 @@ export function CityMap({ zones, states }: Props) {
   const towerCount = buildings?.features.length ?? 0;
 
   const stepDown = (from: Engine, message: string) => {
-    console.warn(`[sadd] ${from} map unavailable:`, message);
+    console.warn(`[sadd] ${from} map unavailable, stepping down:`, message);
     setFailure(message);
     setReady(false);
     setEngine(from === "vector" ? "3d" : "fallback");
@@ -108,12 +108,10 @@ export function CityMap({ zones, states }: Props) {
               <span className={`ms-1 h-1.5 w-1.5 rounded-full ${towers ? "bg-accent" : "bg-white/30"}`} />
             </button>
           )}
-          {engine === "3d" && (
-            <div className="status-pill text-fg-2">
-              <Box size={13} className="text-accent" />
-              {t(lang, "map_3d_no_mesh")}
-            </div>
-          )}
+          <div className="status-pill text-fg-2">
+            <Box size={13} className="text-accent" />
+            {t(lang, engine === "vector" ? "map_engine_vector" : "map_3d_no_mesh")}
+          </div>
         </div>
       )}
 

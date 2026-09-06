@@ -143,6 +143,7 @@ export function GoogleVectorMap({
         });
         mapRef.current = map;
         libRef.current = lib;
+        console.info("[sadd] map engine: vector (Map ID", mapId + ")");
 
         // 3D buildings need vector rendering; RASTER means the Map ID (or the device) cannot do it.
         map.addListener("renderingtype_changed", () => {
@@ -179,10 +180,10 @@ export function GoogleVectorMap({
         const poly = new lib.Polygon({
           paths: z.geometry.coordinates[0].map(([lng, lat]) => ({ lat, lng })),
           fillColor: "#22c55e",
-          fillOpacity: 0.3,
+          fillOpacity: 0.1,
           strokeColor: "#22c55e",
-          strokeOpacity: 0.95,
-          strokeWeight: 2,
+          strokeOpacity: 0.9,
+          strokeWeight: 1.5,
           clickable: true,
           zIndex: 1,
           map,
@@ -233,11 +234,13 @@ export function GoogleVectorMap({
       const key = `${q}|${isSel ? 1 : 0}`;
       if (lastColor.current.get(id) === key) continue;
       lastColor.current.set(id, key);
+      // Outline carries the colour; the fill stays a tint so Google's buildings show through.
+      const fill = q >= 80 ? 0.34 : q >= 60 ? 0.26 : q >= 40 ? 0.18 : 0.1;
       poly.setOptions({
         fillColor: riskColor(q),
-        fillOpacity: isSel ? 0.48 : q >= 40 ? 0.36 : 0.26,
+        fillOpacity: isSel ? Math.max(0.3, fill) : fill,
         strokeColor: isSel ? "#ffffff" : riskColor(q),
-        strokeWeight: isSel ? 3.5 : 2,
+        strokeWeight: isSel ? 3 : q >= 40 ? 2.2 : 1.5,
       });
     }
     paintTowers();
