@@ -3,8 +3,25 @@
  * keep the two in sync (a generated OpenAPI client is a Phase-4 nicety, not a need).
  */
 
-/** Empty string = same origin (the production image, where FastAPI serves the static export). */
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+/**
+ * Where the browser reaches FastAPI.
+ *  - Production image: empty → same origin (FastAPI serves the static export itself).
+ *  - `next dev` on :3000: FastAPI on http://localhost:8000.
+ * A configured localhost base is ignored when the page itself is not on localhost, so a
+ * copied-over dev value (e.g. Railway's "suggested variables" from .env.example) cannot
+ * break a hosted deployment.
+ */
+function resolveApiBase(): string {
+  const configured = (process.env.NEXT_PUBLIC_API_BASE ?? "").trim();
+  if (typeof window === "undefined") return configured || "http://localhost:8000";
+  const here = window.location;
+  const pageIsLocal = /^(localhost|127\.0\.0\.1)$/.test(here.hostname);
+  const baseIsLocal = /localhost|127\.0\.0\.1/.test(configured);
+  if (configured && (pageIsLocal || !baseIsLocal)) return configured;
+  return pageIsLocal && here.port === "3000" ? "http://localhost:8000" : "";
+}
+
+export const API_BASE = resolveApiBase();
 
 export type Severity = "yellow" | "orange" | "red";
 export type Band = "green" | Severity;
