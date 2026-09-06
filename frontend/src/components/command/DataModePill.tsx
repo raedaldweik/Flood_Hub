@@ -15,17 +15,13 @@ export function DataModePill({ meta }: { meta?: Meta }) {
 
   return (
     <div
-      className={clsx(
-        "flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold tracking-wider",
-        live ? "border-green/40 bg-green/10 text-green" : "border-yellow/40 bg-yellow/10 text-yellow",
-      )}
+      className={clsx("status-pill", live ? "text-green" : "text-yellow")}
+      style={{ borderColor: live ? "rgba(34,197,94,0.35)" : "rgba(234,179,8,0.35)" }}
       title={live ? t(lang, "source_live") : `${t(lang, "pill_replay_sub")} · ${source}`}
     >
       <span className={clsx("dot", live ? "bg-green dot-pulse" : "bg-yellow")} />
       {live ? t(lang, "pill_live") : t(lang, "pill_simulated")}
-      <span className="hidden font-normal normal-case tracking-normal text-fg-2 xl:inline">
-        · {live ? t(lang, "source_live") : source}
-      </span>
+      <span className="hidden font-medium tracking-normal text-fg-2 xl:inline">· {live ? t(lang, "source_live") : source}</span>
     </div>
   );
 }

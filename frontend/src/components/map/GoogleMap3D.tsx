@@ -160,5 +160,5 @@ export function GoogleMap3D({ apiKey, zones, states, selected, onSelect, flyRequ
     map.addEventListener("gmp-animationend", resume);
   }, [resetRequest]);
 
-  return <div ref={container} className="map-fill" />;
+  return <div ref={container} className="map-fill isolate" />;
 }

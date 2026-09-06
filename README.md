@@ -9,7 +9,7 @@ custom MCP servers and visible governance.**
 
 ![Command Center — replay of the April 2024 storm at its peak (2D fallback map, no Maps key)](docs/screenshots/command-center-replay-fallback-map.png)
 
-*Phase 1 screenshot on the MapLibre fallback (no Google Maps key, offline basemap tiles). With
+*Phase 1 screenshot on the MapLibre fallback (no Google Maps key, and captured offline so no basemap tiles or extruded buildings). With
 `NEXT_PUBLIC_GOOGLE_MAPS_KEY` set the same view renders on Google's photorealistic 3D tiles.*
 
 ---

@@ -22,21 +22,22 @@ export function AlertFeed({ alerts, zones }: Props) {
 
   // In replay only alerts raised at or before the current tick exist yet.
   const visible = mode === "replay" ? alerts.filter((a) => (a.tick ?? 0) <= tick) : [];
+  const active = visible.filter((a) => a.cleared_tick == null || a.cleared_tick > tick).length;
   const names = Object.fromEntries(zones.map((z) => [z.properties.id, lang === "ar" ? z.properties.name_ar : z.properties.name_en]));
 
   return (
     <section className="glass flex h-full min-h-0 flex-col">
-      <header className="flex items-center justify-between border-b border-line px-4 py-3">
-        <h2 className="flex items-center gap-2 text-[13px] font-semibold">
-          <BellRing size={14} className="text-accent" />
-          {t(lang, "alerts_title")}
-        </h2>
-        <span className="num rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] text-fg-2">{visible.length}</span>
+      <header className="flex items-center gap-3 px-4 pb-3 pt-4">
+        <span className="panel-title">{t(lang, "alerts_title")}</span>
+        <span className="accent-line" />
+        <span className={clsx("dot", active ? "bg-red dot-pulse" : "bg-muted")} />
+        <span className="num status-pill py-1 text-[11px]">{visible.length}</span>
       </header>
 
-      <ol className="min-h-0 flex-1 overflow-y-auto p-2">
+      <ol className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-3">
         {visible.length === 0 && (
-          <li className="px-3 py-8 text-center text-[12px] leading-relaxed text-muted">
+          <li className="glass-inset mx-1 mt-1 px-4 py-6 text-center text-[12px] leading-relaxed text-muted">
+            <BellRing size={18} className="mx-auto mb-2 text-accent/70" />
             {mode === "replay" ? t(lang, "alerts_empty_replay") : t(lang, "alerts_empty_live")}
           </li>
         )}
@@ -45,35 +46,32 @@ export function AlertFeed({ alerts, zones }: Props) {
           const color = BAND_COLORS[a.severity];
           const isUnderpass = a.type === "underpass_closure";
           return (
-            <li key={a.id} className="fade-in">
+            <li key={a.id} className="animate-slide-up">
               <button
                 onClick={() => requestFly(a.zone_id)}
                 className={clsx(
-                  "group relative w-full rounded-lg px-3 py-2.5 text-start transition hover:bg-white/[0.04]",
-                  selected === a.zone_id && "bg-white/[0.05]",
-                  cleared && "opacity-50",
+                  "glass-inset group relative w-full overflow-hidden px-3.5 py-3 text-start transition-all hover:-translate-y-px hover:border-line-2 hover:bg-white/[0.06]",
+                  selected === a.zone_id && "border-line-2 bg-white/[0.06]",
+                  cleared && "opacity-45 saturate-50",
                 )}
               >
-                <span className="absolute inset-y-2 start-0 w-[3px] rounded-full" style={{ background: color }} />
+                <span className="absolute inset-y-2.5 start-0 w-[3px] rounded-e-full" style={{ background: color, boxShadow: `0 0 10px ${color}` }} />
                 <div className="flex items-center gap-2">
                   <span
-                    className="rounded px-1.5 py-px text-[10px] font-bold uppercase tracking-wider"
-                    style={{ color, background: `${color}22`, border: `1px solid ${color}55` }}
+                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-px text-[9.5px] font-extrabold uppercase tracking-[0.12em]"
+                    style={{ color, background: `${color}1f`, border: `1px solid ${color}55` }}
                   >
-                    {isUnderpass ? <TrafficCone size={11} className="inline -mt-px" /> : null} {a.severity}
+                    {isUnderpass && <TrafficCone size={10} />}
+                    {a.severity}
                   </span>
-                  <span className="truncate text-[12.5px] font-medium text-fg">{names[a.zone_id] ?? a.zone_id}</span>
-                  <span className="num ms-auto text-[11px] text-muted">{fmtTime(a.ts, lang)}</span>
+                  <span className="truncate text-[13px] font-bold text-fg">{names[a.zone_id] ?? a.zone_id}</span>
+                  <span className="num ms-auto text-[11px] font-semibold text-muted">{fmtTime(a.ts, lang)}</span>
                 </div>
-                <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-fg-2">
-                  {lang === "ar" ? a.message_ar : a.message_en}
-                </p>
-                <div className="mt-1.5 flex items-center gap-2 text-[10.5px] text-muted">
-                  <span className="rounded border border-line px-1.5 py-px font-mono">
-                    {a.rule_id} v{a.rule_version}
-                  </span>
+                <p className="mt-1.5 line-clamp-2 text-[12px] leading-snug text-fg-2">{lang === "ar" ? a.message_ar : a.message_en}</p>
+                <div className="mt-2 flex items-center gap-2 text-[10.5px] text-muted">
+                  <span className="trace-step-tool">{a.rule_id} v{a.rule_version}</span>
                   <span>{isUnderpass ? t(lang, "alerts_underpass") : t(lang, "alerts_zone_risk")}</span>
-                  <span className={clsx("ms-auto", cleared ? "text-muted" : "text-green")}>
+                  <span className={clsx("ms-auto font-bold uppercase tracking-wider", cleared ? "text-muted" : "text-green")}>
                     {cleared ? t(lang, "alerts_cleared") : t(lang, "alerts_active")}
                   </span>
                 </div>

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Inter, Noto_Sans_Arabic } from "next/font/google";
+import { Manrope, Noto_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 import { LangSync } from "@/components/layout/LangSync";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", display: "swap" });
 const arabic = Noto_Sans_Arabic({ subsets: ["arabic"], variable: "--font-arabic", display: "swap" });
 
 export const metadata: Metadata = {
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" dir="ltr" suppressHydrationWarning className={`${inter.variable} ${arabic.variable}`}>
+    <html lang="en" dir="ltr" suppressHydrationWarning className={`${manrope.variable} ${arabic.variable}`}>
       <body className="h-full">
         <LangSync />
         {children}

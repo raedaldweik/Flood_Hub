@@ -15,7 +15,7 @@ export const ESTABLISHING: Camera = { lat: 25.275, lng: 51.525, altitude: 0, ran
 export const CITY_CENTER = { lat: 25.285, lng: 51.531 };
 
 /** 2D fallback framing: all twelve zones visible at 1080p with a 48° pitch. */
-export const FALLBACK_FRAME = { lat: 25.245, lng: 51.52, zoom: 11.1 };
+export const FALLBACK_FRAME = { lat: 25.242, lng: 51.525, zoom: 11.55 };
 
 /** Pick a range that frames a zone from its area (km²) — tuned by eye at 1080p. */
 export function zoneCamera(centroid: [number, number], areaKm2: number, heading = 25): Camera {
