@@ -76,6 +76,15 @@ export function CityMap({ zones, states }: Props) {
         </div>
       )}
 
+      {use3D && threeD === "ready" && (
+        <div className="pointer-events-none absolute bottom-[152px] end-3.5 z-10 flex flex-col items-end gap-2">
+          <div className="status-pill text-fg-2">
+            <Box size={13} className="text-accent" />
+            {t(lang, "map_3d_no_mesh")}
+          </div>
+        </div>
+      )}
+
       {!use3D && (
         <div className="pointer-events-none absolute bottom-[152px] end-3.5 z-10 flex flex-col items-end gap-2">
           <div className="status-pill text-fg-2">

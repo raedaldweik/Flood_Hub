@@ -89,17 +89,15 @@ set it now. Follow the steps in order.
      If it shows `[sadd] startup: seed_failed`, the traceback right above it says why.
 - **The page says "Warming up the twin":** normal on the first boot — the database is being
   seeded from the Open-Meteo archive. It clears by itself in about a minute.
-- **The map is satellite imagery but looks flat, not 3D:** three things to check, in order.
-  1. **Get close enough.** Photorealistic buildings only appear within a couple of kilometres;
-     the opening shot is 19 km up on purpose so all twelve zones fit. Click the **3D skyline**
-     button (building icon, bottom-right of the time controls). It flies to the West Bay
-     towers at 1.6 km — give the mesh a few seconds to sharpen after the camera stops.
-  2. **Map Tiles API.** Google Cloud → APIs & Services → Enabled APIs. Both *Maps JavaScript
-     API* and *Map Tiles API* must be listed; the photorealistic mesh comes from the second
-     one. If your key has API restrictions, both must be allowed. Press F12 → Console on the
-     page: an error mentioning "Map Tiles API" confirms this is the cause.
-  3. **Coverage.** Where Google has no 3D mesh, the map drapes flat satellite imagery instead.
-     If West Bay stays flat after steps 1 and 2, that is what you are seeing.
+- **The map is satellite imagery but looks flat, not 3D:** this is expected in Qatar. Google's
+  Photorealistic 3D Tiles (the building mesh) do not cover Doha — verified on a live key:
+  flat imagery at every range, both APIs enabled, no Map Tiles errors in the console. The map
+  is Google's 3D engine drawing satellite imagery on terrain, which is why the small pill on
+  the map says so. Keep the camera 4 km or higher (the **Bay view** button does) where the
+  oblique imagery still looks good. The same `Map3DElement` will show the mesh with no code
+  change on the day Google adds Qatar. If you *do* see an error mentioning "Map Tiles API"
+  in F12 → Console, that API is disabled or blocked by the key's restrictions — fix that
+  first.
 - **Map shows the 2D fallback banner:** the Maps key was empty when Railway built the image.
   Set it, then Deployments → ⋮ → **Redeploy** (the key is baked in at build time).
 - **"Database not seeded" or "Backend unreachable":** open `sadd-app` → Deployments → View

@@ -26,6 +26,14 @@ function toCamera(c: Camera): google.maps.maps3d.CameraOptions {
   return { center: { lat: c.lat, lng: c.lng, altitude: c.altitude ?? 0 }, range: c.range, tilt: c.tilt, heading: c.heading };
 }
 
+// A quarter turn over five minutes: alive, never distracting. `repeatCount` is the runtime's
+// current name for the (deprecated) `rounds` option; the typings still lag behind it.
+const ORBIT = {
+  camera: toCamera(ESTABLISHING),
+  durationMillis: 300_000,
+  repeatCount: 0.25,
+} as google.maps.maps3d.FlyAroundAnimationOptions;
+
 /**
  * Photorealistic 3D Doha (Map3DElement, HYBRID mode so Google's own district labels show).
  * Zones are draped Polygon3DInteractiveElements coloured by risk; the camera drifts slowly
@@ -101,8 +109,7 @@ export function GoogleMap3D({ apiKey, zones, states, selected, onSelect, flyRequ
       const map = mapRef.current;
       if (!map || drifting.current) return;
       drifting.current = true;
-      // A quarter turn over five minutes: alive, never distracting.
-      map.flyCameraAround({ camera: toCamera(ESTABLISHING), durationMillis: 300_000, rounds: 0.25 });
+      map.flyCameraAround(ORBIT);
     }
 
     return () => {
@@ -145,7 +152,7 @@ export function GoogleMap3D({ apiKey, zones, states, selected, onSelect, flyRequ
     map.flyCameraTo({ endCamera: toCamera(zoneCamera(z.properties.centroid, z.properties.area_km2)), durationMillis: 2600 });
   }, [flyRequest, selected]);
 
-  // Dive to the West Bay skyline — the shot that proves the mesh is photorealistic 3D.
+  // Bay view over West Bay and the Corniche (see SKYLINE for why it stays at 5 km).
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !skylineRequest) return;
@@ -164,7 +171,7 @@ export function GoogleMap3D({ apiKey, zones, states, selected, onSelect, flyRequ
       map.removeEventListener("gmp-animationend", resume);
       if (!drifting.current) {
         drifting.current = true;
-        map.flyCameraAround({ camera: toCamera(ESTABLISHING), durationMillis: 300_000, rounds: 0.25 });
+        map.flyCameraAround(ORBIT);
       }
     };
     map.addEventListener("gmp-animationend", resume);

@@ -10,7 +10,8 @@ custom MCP servers and visible governance.**
 ![Command Center — replay of the April 2024 storm at its peak (2D fallback map, no Maps key)](docs/screenshots/command-center-replay-fallback-map.png)
 
 *Phase 1 screenshot on the MapLibre fallback (no Google Maps key, and captured offline so no basemap tiles or extruded buildings). With
-`NEXT_PUBLIC_GOOGLE_MAPS_KEY` set the same view renders on Google's photorealistic 3D tiles.*
+`NEXT_PUBLIC_GOOGLE_MAPS_KEY` set the same view renders on Google's `Map3DElement` — satellite imagery draped on terrain, because Google's
+photorealistic building mesh does not cover Qatar yet; the same element lights up when it does.*
 
 ---
 
@@ -85,7 +86,7 @@ engine escalation/clear-down, replay math, API smoke).
 
 | Variable | Purpose | Missing → |
 |---|---|---|
-| `NEXT_PUBLIC_GOOGLE_MAPS_KEY` | Photorealistic 3D (enable **Maps JavaScript API** + **Map Tiles API**) | dark 2D MapLibre fallback with a banner |
+| `NEXT_PUBLIC_GOOGLE_MAPS_KEY` | Google 3D map — imagery on terrain; no photorealistic mesh in Qatar yet (enable **Maps JavaScript API** + **Map Tiles API**) | dark 2D MapLibre fallback with a banner |
 | `GEMINI_API_KEY` | Rafid (ADK) + embeddings (Phase 3) | Rafid shows an offline notice |
 | — | Open-Meteo needs **no key** | seed falls back to a bundled synthetic storm curve, clearly labelled |
 
