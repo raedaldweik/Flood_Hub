@@ -82,9 +82,8 @@ export function TimeControls({ timeline, live, alerts }: Props) {
             <span className="text-[14px] font-extrabold">{t(lang, "time_today")} · {fmtDate(new Date(), lang)}</span>
           </div>
         )}
-        <button onClick={requestSkyline} className="btn-ghost" title={t(lang, "time_skyline")}>
+        <button onClick={requestSkyline} className="btn-ghost" title={t(lang, "time_skyline")} aria-label={t(lang, "time_skyline")}>
           <Building2 size={13} />
-          <span className="hidden 2xl:inline">{t(lang, "time_skyline")}</span>
         </button>
         <button onClick={requestReset} className="btn-ghost" title={t(lang, "time_reset")}>
           <RotateCcw size={13} />
