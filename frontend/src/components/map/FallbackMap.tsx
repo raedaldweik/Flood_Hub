@@ -3,11 +3,12 @@
 import { useEffect, useRef } from "react";
 import maplibregl, { type Map as MlMap, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { ZoneFeature } from "@/lib/api";
+import type { Asset, ZoneFeature } from "@/lib/api";
 import { FALLBACK_FRAME as FRAME, SKYLINE_FRAME } from "@/lib/camera";
 import type { Lang } from "@/lib/i18n";
 import { BAND_COLORS, bandOf, quantiseRisk, riskColor } from "@/lib/risk";
 import type { ZoneNow } from "@/hooks/useZoneNow";
+import { createFleetPin, FleetTween, paintFleetPin } from "./fleetPins";
 
 interface Props {
   zones: ZoneFeature[];
@@ -18,6 +19,8 @@ interface Props {
   resetRequest: number;
   skylineRequest: number;
   lang: Lang;
+  assets?: Asset[];
+  showFleet?: boolean;
   onBasemap?: (ok: boolean) => void;
 }
 
@@ -54,10 +57,13 @@ async function loadStyle(): Promise<{ style: StyleSpecification; online: boolean
  * library fails: dark vector basemap with extruded buildings, glowing risk zones that pulse when
  * red, and HUD labels with live scores. Same data, same colours, same interactions as the 3D map.
  */
-export function FallbackMap({ zones, states, selected, onSelect, flyRequest, resetRequest, skylineRequest, lang, onBasemap }: Props) {
+export function FallbackMap({ zones, states, selected, onSelect, flyRequest, resetRequest, skylineRequest, lang, assets = [], showFleet = true, onBasemap }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const markers = useRef<Map<string, maplibregl.Marker>>(new Map());
+  const fleetPins = useRef<Map<string, { marker: maplibregl.Marker; el: HTMLElement }>>(new Map());
+  const fleetTween = useRef(new FleetTween());
+  const fleetRaf = useRef(0);
   const zonesRef = useRef(zones);
   zonesRef.current = zones;
   const statesRef = useRef(states);
@@ -207,10 +213,13 @@ export function FallbackMap({ zones, states, selected, onSelect, flyRequest, res
     });
 
     const markerStore = markers.current;
+    const fleetStore = fleetPins.current;
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
+      cancelAnimationFrame(fleetRaf.current);
       markerStore.clear();
+      fleetStore.clear();
       map.remove();
       mapRef.current = null;
       loaded.current = false;
@@ -221,6 +230,47 @@ export function FallbackMap({ zones, states, selected, onSelect, flyRequest, res
   useEffect(() => {
     paintRef.current();
   }, [states, selected, lang]);
+
+  // Fleet pins: same DOM + tween as the Google engines, hosted by maplibre markers.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const pins = fleetPins.current;
+    const tween = fleetTween.current;
+    const seen = new Set<string>();
+    for (const a of assets) {
+      seen.add(a.id);
+      let pin = pins.get(a.id);
+      const isNew = !pin;
+      if (!pin) {
+        const el = createFleetPin();
+        const marker = new maplibregl.Marker({ element: el, anchor: "center" }).setLngLat([a.lng, a.lat]);
+        pin = { marker, el };
+        pins.set(a.id, pin);
+      }
+      if (showFleet) pin.marker.addTo(map);
+      else pin.marker.remove();
+      paintFleetPin(pin.el, a, lang);
+      tween.set(a.id, { lat: a.lat, lng: a.lng }, !isNew);
+      if (isNew) pin.marker.setLngLat([a.lng, a.lat]);
+    }
+    for (const [id, pin] of pins) {
+      if (!seen.has(id)) {
+        pin.marker.remove();
+        pins.delete(id);
+        tween.remove(id);
+      }
+    }
+    const loop = (now: number) => {
+      for (const id of tween.tick(now)) {
+        const pos = tween.get(id);
+        const pin = pins.get(id);
+        if (pos && pin) pin.marker.setLngLat([pos.lng, pos.lat]);
+      }
+      fleetRaf.current = tween.animating ? requestAnimationFrame(loop) : 0;
+    };
+    if (tween.animating && !fleetRaf.current) fleetRaf.current = requestAnimationFrame(loop);
+  }, [assets, showFleet, lang]);
 
   // Zones can arrive after mount.
   useEffect(() => {

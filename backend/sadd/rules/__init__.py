@@ -5,6 +5,6 @@ Rules are versioned pure functions (`rules.py`); the engine (`engine.py`) runs t
 timeline and emits alert + decision_log records. No LLM is ever in this call path.
 """
 
-from .dispatch import PlanRejected, validate_and_apply  # noqa: F401
+from .dispatch import PlanRejected, stand_down, validate_and_apply  # noqa: F401
 from .engine import EngineOutput, evaluate_timeline  # noqa: F401
 from .rules import RULES, Decision, Rule, RuleInputs, catalog, get_rule  # noqa: F401

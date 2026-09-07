@@ -121,6 +121,11 @@ set it now. Follow the steps in order.
 - **"Database not seeded" or "Backend unreachable":** open `sadd-app` → Deployments → View
   logs. If it says the database is not reachable, check `DATABASE_URL` references the exact
   database service name, and that `sadd-db` is Online.
+- **Trucks do not move after APPROVE, or the Executive tab shows no pre-position lead time:**
+  the database was seeded by an older build. Delete the volume on `sadd-db` and redeploy both
+  services — the fresh seed carries the model-scored replay, the gauge forecasts for the flood
+  MCP and the R-04 recommendations. To put the fleet back at its depots between rehearsals, use
+  **Stand down fleet** on the Response & Governance tab (rule R-08, logged like everything else).
 - **Re-seed from scratch:** delete the volume on `sadd-db` and redeploy both services.
 - Nothing else needs setting. Do not add `NEXT_PUBLIC_API_BASE`, `CORS_ORIGINS`,
   `FRONTEND_DIST` or `SADD_DATA_DIR`.

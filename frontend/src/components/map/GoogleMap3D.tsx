@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { BuildingFeature, ZoneFeature } from "@/lib/api";
+import type { Asset, BuildingFeature, ZoneFeature } from "@/lib/api";
 import { ESTABLISHING, SKYLINE, zoneCamera, type Camera } from "@/lib/camera";
 import { loadMaps3D } from "@/lib/googleMaps";
 import { quantiseRisk, riskColor, riskColorAlpha } from "@/lib/risk";
 import type { ZoneNow } from "@/hooks/useZoneNow";
+import type { Lang } from "@/lib/i18n";
+import { FLEET_COLORS } from "./fleetPins";
 
 interface Props {
   apiKey: string;
@@ -19,6 +21,9 @@ interface Props {
   /** Risk-lit towers: OSM footprints extruded to their height, lit by their zone's risk. */
   buildings: BuildingFeature[];
   showTowers: boolean;
+  assets: Asset[];
+  showFleet: boolean;
+  lang: Lang;
   onReady: () => void;
   onError: (message: string) => void;
 }
@@ -49,13 +54,14 @@ const ORBIT = {
  * around the establishing shot and flies to a zone on request.
  */
 export function GoogleMap3D({
-  apiKey, zones, states, selected, onSelect, flyRequest, resetRequest, skylineRequest, buildings, showTowers, onReady, onError,
+  apiKey, zones, states, selected, onSelect, flyRequest, resetRequest, skylineRequest, buildings, showTowers, assets, showFleet, lang, onReady, onError,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.maps3d.Map3DElement | null>(null);
   const polys = useRef<Map<string, Polygon>>(new Map());
   const lastColor = useRef<Map<string, string>>(new Map());
   const towers = useRef<Map<number, Tower>>(new Map());
+  const fleet = useRef<Map<string, google.maps.maps3d.Marker3DElement>>(new Map());
   const towerColor = useRef<Map<number, string>>(new Map());
   const buildingsRef = useRef(buildings);
   buildingsRef.current = buildings;
@@ -81,6 +87,7 @@ export function GoogleMap3D({
     const polyMap = polys.current;
     const towerMap = towers.current;
     const towerColorMap = towerColor.current;
+    const fleetMap = fleet.current;
 
     (async () => {
       try {
@@ -192,6 +199,7 @@ export function GoogleMap3D({
       polyMap.clear();
       towerMap.clear();
       towerColorMap.clear();
+      fleetMap.clear();
       el.replaceChildren();
       mapRef.current = null;
     };
@@ -212,6 +220,36 @@ export function GoogleMap3D({
   useEffect(() => {
     paintTowersRef.current();
   }, [states]);
+
+  // Fleet pins on the photorealistic map: Marker3DElements, coloured by status (no tween on this engine).
+  useEffect(() => {
+    const map = mapRef.current;
+    const lib = libRef.current;
+    if (!map || !lib || !lib.Marker3DElement) return;
+    const seen = new Set<string>();
+    for (const a of assets) {
+      seen.add(a.id);
+      let m = fleet.current.get(a.id);
+      if (!m) {
+        m = new lib.Marker3DElement({ altitudeMode: "RELATIVE_TO_GROUND", extruded: true, sizePreserved: true });
+        fleet.current.set(a.id, m);
+      }
+      m.position = { lat: a.lat, lng: a.lng, altitude: 30 };
+      m.label = lang === "ar" ? a.callsign_ar : a.callsign;
+      m.style.setProperty("--gmp-marker-color", FLEET_COLORS[a.status] ?? FLEET_COLORS.idle);
+      if (showFleet) {
+        if (!m.isConnected) map.append(m);
+      } else {
+        m.remove();
+      }
+    }
+    for (const [id, m] of fleet.current) {
+      if (!seen.has(id)) {
+        m.remove();
+        fleet.current.delete(id);
+      }
+    }
+  }, [assets, showFleet, lang]);
 
   // Layer toggle: detach or re-attach every tower element.
   useEffect(() => {

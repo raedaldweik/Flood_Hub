@@ -14,6 +14,13 @@ export function fmtTime(iso: string | Date, lang: Lang, withDate = false): strin
   }).format(d);
 }
 
+/** "Tue 14:30" — compact axis label for multi-day series. */
+export function fmtDayTime(iso: string | Date, lang: Lang): string {
+  const d = typeof iso === "string" ? new Date(iso) : iso;
+  const locale = lang === "ar" ? "ar-QA-u-nu-latn" : "en-GB";
+  return new Intl.DateTimeFormat(locale, { timeZone: TZ, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+}
+
 export function fmtDate(iso: string | Date, lang: Lang): string {
   const d = typeof iso === "string" ? new Date(iso) : iso;
   const locale = lang === "ar" ? "ar-QA-u-nu-latn" : "en-GB";

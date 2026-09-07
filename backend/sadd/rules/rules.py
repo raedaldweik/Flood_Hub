@@ -5,8 +5,9 @@ Adding a rule = add a class, register it in RULES, add tests. Changing a thresho
 decision can be replayed against the code that made it.
 
 The zone-risk ladder (R-06 yellow → R-02 orange → R-01 red), the underpass closure action
-item (R-03), the clear-down rule (R-07), forecast pre-positioning (R-04) and agent plan
-validation (R-05 — the only gate through which an agent proposal can touch asset state).
+item (R-03), the clear-down rule (R-07), forecast pre-positioning (R-04), agent plan
+validation (R-05 — the only gate through which an agent proposal can touch asset state) and the
+operator stand-down (R-08 — the only way the fleet returns to depots).
 """
 
 from __future__ import annotations
@@ -360,6 +361,35 @@ class R05PlanValidation:
         return errors
 
 
+class R08StandDown:
+    """Operator stand-down of the whole fleet. Not a timeline rule; `validate` is called by
+    rules.dispatch.stand_down — the second and last path that touches asset state (both live in dispatch.py)."""
+
+    id = "R-08"
+    version = "1.0"
+    name_en = "Operator stand-down of the fleet"
+    name_ar = "إنهاء انتشار الأسطول بأمر المشغل"
+    description_en = (
+        "Operator-initiated stand-down → every unit returns to its depot as idle. Requires an operator id and "
+        "a non-empty fleet; nothing else can reset asset state. Logged with the fleet snapshot before and after."
+    )
+    description_ar = (
+        "إنهاء انتشار بأمر المشغل → تعود كل وحدة إلى مستودعها في وضع الخمول. يتطلب معرف مشغل وأسطولاً "
+        "غير فارغ؛ ولا يمكن لأي مسار آخر إعادة ضبط حالة الأصول. يُسجل مع لقطة الأسطول قبل وبعد."
+    )
+
+    def evaluate(self, x: RuleInputs) -> Decision | None:  # noqa: ARG002 — not a timeline rule
+        return None
+
+    def validate(self, operator_id: str, fleet_size: int) -> list[str]:
+        errors: list[str] = []
+        if not isinstance(operator_id, str) or len(operator_id.strip()) < 2:
+            errors.append("an operator id is required to stand the fleet down")
+        if fleet_size <= 0:
+            errors.append("no units to stand down")
+        return errors
+
+
 RULES: list[Rule] = [
     R01RedAlert(),
     R02OrangeAlert(),
@@ -368,6 +398,7 @@ RULES: list[Rule] = [
     R04PrePosition(),
     R07ClearDown(),
     R05PlanValidation(),
+    R08StandDown(),
 ]
 
 

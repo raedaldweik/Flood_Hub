@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
-from .api import agent, alerts, assets, buildings, live, meta, models, replay, rules, sim, zones
+from .api import agent, alerts, assets, buildings, executive, live, meta, models, replay, rules, sim, zones
 from .config import REPO_ROOT, get_settings
 from .db import close_pool
 from .startup import STATE, start_background
@@ -60,7 +60,7 @@ app.add_middleware(
 )
 for r in (
     meta.router, zones.router, replay.router, alerts.router, assets.router, rules.router, live.router, agent.router,
-    buildings.router, models.router, sim.router,
+    buildings.router, models.router, sim.router, executive.router,
 ):
     app.include_router(r)
 

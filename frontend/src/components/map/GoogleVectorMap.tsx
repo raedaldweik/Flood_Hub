@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { BuildingFeature, ZoneFeature } from "@/lib/api";
+import type { Asset, BuildingFeature, ZoneFeature } from "@/lib/api";
 import { CITY_CENTER, VECTOR_BAY, VECTOR_ESTABLISHING, vectorZoneView, type VectorView } from "@/lib/camera";
 import { loadMapsLib } from "@/lib/googleMaps";
 import { bandOf, quantiseRisk, riskColor } from "@/lib/risk";
 import type { ZoneNow } from "@/hooks/useZoneNow";
+import type { Lang } from "@/lib/i18n";
+import { createFleetPin, FleetTween, paintFleetPin } from "./fleetPins";
 import { createTowersOverlay, type TowersOverlay } from "./towersOverlay";
 
 interface Props {
@@ -20,11 +22,68 @@ interface Props {
   skylineRequest: number;
   buildings: BuildingFeature[];
   showTowers: boolean;
+  assets: Asset[];
+  showFleet: boolean;
+  lang: Lang;
   onReady: () => void;
   onError: (message: string) => void;
 }
 
 const DRIFT_DEG_PER_S = 0.6;
+
+interface FleetLayer {
+  sync: (assets: Asset[], show: boolean, lang: Lang) => void;
+  dispose: () => void;
+}
+
+/** Fleet pins as AdvancedMarkerElements; re-tasked units glide to their new spot (FleetTween). */
+function createFleetLayer(markerLib: google.maps.MarkerLibrary, map: google.maps.Map): FleetLayer {
+  const pins = new Map<string, { marker: google.maps.marker.AdvancedMarkerElement; el: HTMLElement }>();
+  const tween = new FleetTween();
+  let raf = 0;
+  const loop = (now: number) => {
+    for (const id of tween.tick(now)) {
+      const pos = tween.get(id);
+      const pin = pins.get(id);
+      if (pos && pin) pin.marker.position = pos;
+    }
+    raf = tween.animating ? requestAnimationFrame(loop) : 0;
+  };
+  return {
+    sync(assets, show, lang) {
+      const seen = new Set<string>();
+      for (const a of assets) {
+        seen.add(a.id);
+        let pin = pins.get(a.id);
+        const isNew = !pin;
+        if (!pin) {
+          const el = createFleetPin();
+          const marker = new markerLib.AdvancedMarkerElement({ map: show ? map : null, content: el, position: { lat: a.lat, lng: a.lng }, zIndex: a.type === "pump_truck" ? 20 : 10 });
+          pin = { marker, el };
+          pins.set(a.id, pin);
+        } else {
+          pin.marker.map = show ? map : null;
+        }
+        paintFleetPin(pin.el, a, lang);
+        tween.set(a.id, { lat: a.lat, lng: a.lng }, !isNew);
+        if (isNew) pin.marker.position = { lat: a.lat, lng: a.lng };
+      }
+      for (const [id, pin] of pins) {
+        if (!seen.has(id)) {
+          pin.marker.map = null;
+          pins.delete(id);
+          tween.remove(id);
+        }
+      }
+      if (tween.animating && !raf) raf = requestAnimationFrame(loop);
+    },
+    dispose() {
+      cancelAnimationFrame(raf);
+      for (const pin of pins.values()) pin.marker.map = null;
+      pins.clear();
+    },
+  };
+}
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -39,7 +98,7 @@ const lerpHeading = (a: number, b: number, t: number) => {
  * Camera moves are our own eased tweens over `moveCamera`, so every transition is cinematic.
  */
 export function GoogleVectorMap({
-  apiKey, mapId, zones, states, selected, onSelect, flyRequest, resetRequest, skylineRequest, buildings, showTowers, onReady, onError,
+  apiKey, mapId, zones, states, selected, onSelect, flyRequest, resetRequest, skylineRequest, buildings, showTowers, assets, showFleet, lang, onReady, onError,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -47,6 +106,9 @@ export function GoogleVectorMap({
   const polys = useRef<Map<string, google.maps.Polygon>>(new Map());
   const lastColor = useRef<Map<string, string>>(new Map());
   const towersRef = useRef<TowersOverlay | null>(null);
+  const fleetRef = useRef<FleetLayer | null>(null);
+  const fleetArgs = useRef({ assets, showFleet, lang });
+  fleetArgs.current = { assets, showFleet, lang };
   const tweenRaf = useRef(0);
   const driftRaf = useRef(0);
   const drifting = useRef(false);
@@ -164,6 +226,17 @@ export function GoogleVectorMap({
 
         syncPolygons();
         paintTowers();
+
+        // Fleet pins need the marker library (loaded lazily; a failure here must not sink the map).
+        try {
+          const markerLib = (await google.maps.importLibrary("marker")) as google.maps.MarkerLibrary;
+          if (cancelled) return;
+          fleetRef.current = createFleetLayer(markerLib, map);
+          const f = fleetArgs.current;
+          fleetRef.current.sync(f.assets, f.showFleet, f.lang);
+        } catch (err) {
+          console.warn("[sadd] fleet markers unavailable:", err);
+        }
         el.addEventListener("pointerdown", stopDrift);
         el.addEventListener("wheel", stopDrift, { passive: true });
       } catch (err) {
@@ -201,6 +274,8 @@ export function GoogleVectorMap({
       cancelAnimationFrame(tweenRaf.current);
       towersRef.current?.dispose();
       towersRef.current = null;
+      fleetRef.current?.dispose();
+      fleetRef.current = null;
       for (const p of polyMap.values()) p.setMap(null);
       polyMap.clear();
       el.removeEventListener("pointerdown", stopDrift);
@@ -225,6 +300,11 @@ export function GoogleVectorMap({
   useEffect(() => {
     towersRef.current?.setVisible(showTowers);
   }, [showTowers]);
+
+  // Fleet positions change only through the rules engine (approve / stand-down); pins glide there.
+  useEffect(() => {
+    fleetRef.current?.sync(assets, showFleet, lang);
+  }, [assets, showFleet, lang]);
 
   // Recolour zones + towers when risk moves (quantised so 20× playback stays cheap).
   useEffect(() => {

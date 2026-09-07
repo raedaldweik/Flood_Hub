@@ -8,9 +8,14 @@ import {
   type Alert,
   type Asset,
   type BuildingCollection,
+  type Decision,
+  type Depot,
+  type ExecutiveReport,
   type LiveState,
   type LiveWeather,
   type Meta,
+  type Rule,
+  type SimResult,
   type Timeline,
   type ZoneCollection,
   type ZoneExplanation,
@@ -57,4 +62,21 @@ export function useExplain(zoneId: string | null, tick: number, enabled: boolean
     keepPreviousData: true,
     dedupingInterval: 500,
   });
+}
+
+export function useDepots(enabled = true) {
+  return useSWR<Depot[]>(enabled ? endpoints.depots : null, fetchJson, STATIC);
+}
+export function useRules(enabled = true) {
+  return useSWR<Rule[]>(enabled ? endpoints.rules : null, fetchJson, STATIC);
+}
+/** The decision ledger; re-fetched after every approve / stand-down through `mutate(endpoints.decisions)`. */
+export function useDecisions(enabled = true) {
+  return useSWR<Decision[]>(enabled ? endpoints.decisions : null, fetchJson, { ...STATIC, dedupingInterval: 2_000 });
+}
+export function useSimBaseline(enabled = true) {
+  return useSWR<SimResult>(enabled ? endpoints.simBaseline : null, fetchJson, STATIC);
+}
+export function useExecutive(lang: "en" | "ar", enabled = true) {
+  return useSWR<ExecutiveReport>(enabled ? endpoints.executive(lang) : null, fetchJson, { ...STATIC, dedupingInterval: 2_000, keepPreviousData: true });
 }

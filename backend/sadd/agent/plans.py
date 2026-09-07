@@ -9,11 +9,38 @@ from datetime import UTC, datetime
 from ..api.sim import _baseline, _inputs
 from ..models import get_registry
 from ..models.features import hotspot_volume_m3
-from ..sim.physics import BAND_YELLOW
+from ..sim.physics import BAND_YELLOW, ZoneParams
 from ..sim.whatif import Scenario, simulate
 
 MAX_PER_ZONE = 6
 PLANS: dict[str, dict] = {}
+
+
+def greedy_allocation(base_zones: list[dict], zones: list[ZoneParams], fleet: int) -> dict[str, int]:
+    """Trucks in proportion to hotspot water volume × criticality, at least one per flooded zone, at most
+    MAX_PER_ZONE per zone, never more than the fleet. Pure and deterministic — the same call feeds Rafid's
+    proposals and the Executive View's "with SADD" comparison."""
+    by_zone = {z.zone_id: z for z in zones}
+    candidates = [o for o in base_zones if o["peak_risk"] >= BAND_YELLOW and o["peak_depth_cm"] > 0]
+    weights = {
+        o["zone_id"]: hotspot_volume_m3(by_zone[o["zone_id"]], o["peak_depth_cm"]) * by_zone[o["zone_id"]].criticality
+        for o in candidates
+    }
+    alloc: dict[str, int] = {}
+    if not weights:
+        return alloc
+    for o in candidates:  # one truck for every zone that actually floods
+        if o["flooded_h"] > 0:
+            alloc[o["zone_id"]] = 1
+    remaining = fleet - sum(alloc.values())
+    total_w = sum(weights.values())
+    for zid, w in sorted(weights.items(), key=lambda kv: -kv[1]):
+        share = round(remaining * w / total_w) if total_w else 0
+        alloc[zid] = min(MAX_PER_ZONE, alloc.get(zid, 0) + share)
+    while sum(alloc.values()) > fleet:  # rounding can overshoot by a truck or two
+        top = max(alloc, key=lambda k: alloc[k])
+        alloc[top] -= 1
+    return {k: v for k, v in alloc.items() if v > 0}
 
 
 def propose(objective: str, storm_multiplier: float, tick: int | None, lang: str) -> dict:
@@ -26,26 +53,7 @@ def propose(objective: str, storm_multiplier: float, tick: int | None, lang: str
     registry = get_registry()
     zones, rain, dt, fleet = inp["zones"], inp["rain"], inp["tick_minutes"], inp["fleet"]
     base = simulate(Scenario(storm_multiplier=storm_multiplier), zones, rain, dt, registry, baseline=_baseline(inp))
-    by_zone = {z.zone_id: z for z in zones}
-    candidates = [o for o in base["zones"] if o["peak_risk"] >= BAND_YELLOW and o["peak_depth_cm"] > 0]
-    weights = {
-        o["zone_id"]: hotspot_volume_m3(by_zone[o["zone_id"]], o["peak_depth_cm"]) * by_zone[o["zone_id"]].criticality
-        for o in candidates
-    }
-    alloc: dict[str, int] = {}
-    if weights:
-        flooded = [o["zone_id"] for o in candidates if o["flooded_h"] > 0]
-        for zid in flooded:  # one truck for every zone that actually floods
-            alloc[zid] = 1
-        remaining = fleet - sum(alloc.values())
-        total_w = sum(weights.values())
-        for zid, w in sorted(weights.items(), key=lambda kv: -kv[1]):
-            share = round(remaining * w / total_w) if total_w else 0
-            alloc[zid] = min(MAX_PER_ZONE, alloc.get(zid, 0) + share)
-        while sum(alloc.values()) > fleet:  # rounding can overshoot by a truck or two
-            top = max(alloc, key=lambda k: alloc[k])
-            alloc[top] -= 1
-        alloc = {k: v for k, v in alloc.items() if v > 0}
+    alloc = greedy_allocation(base["zones"], zones, fleet)
     scen = Scenario(storm_multiplier=storm_multiplier, allocations=alloc, prepositioned=True)
     out = simulate(scen, zones, rain, dt, registry, baseline=base["kpis"])
     names = {z.zone_id: z for z in zones}

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Box, Building2, WifiOff } from "lucide-react";
-import type { ZoneFeature } from "@/lib/api";
+import { Box, Building2, Truck, WifiOff } from "lucide-react";
+import type { Asset, ZoneFeature } from "@/lib/api";
 import { MAP_ENGINE, MAP_ID, MAPS_KEY } from "@/lib/googleMaps";
 import { t } from "@/lib/i18n";
 import { useUi } from "@/lib/store";
@@ -15,6 +15,10 @@ import { FallbackMap } from "./FallbackMap";
 interface Props {
   zones: ZoneFeature[];
   states: Record<string, ZoneNow>;
+  /** Fleet pins (pump trucks + tankers). Omit to hide the layer and its toggle. */
+  assets?: Asset[];
+  /** Where the toggles sit — the Command Center keeps them above its time controls. */
+  chromeBottom?: number;
 }
 
 /**
@@ -25,8 +29,10 @@ interface Props {
  */
 type Engine = "vector" | "3d" | "fallback";
 
-export function CityMap({ zones, states }: Props) {
+export function CityMap({ zones, states, assets, chromeBottom = 152 }: Props) {
   const lang = useUi((s) => s.lang);
+  const fleetOn = useUi((s) => s.fleet);
+  const setFleet = useUi((s) => s.setFleet);
   const selected = useUi((s) => s.selectedZone);
   const requestFly = useUi((s) => s.requestFly);
   const flyRequest = useUi((s) => s.flyRequest);
@@ -63,6 +69,9 @@ export function CityMap({ zones, states }: Props) {
     skylineRequest,
     buildings: buildings?.features ?? [],
     showTowers: towers,
+    assets: assets ?? [],
+    showFleet: fleetOn && Boolean(assets),
+    lang,
     onReady: () => setReady(true),
   };
 
@@ -80,6 +89,8 @@ export function CityMap({ zones, states }: Props) {
           resetRequest={resetRequest}
           skylineRequest={skylineRequest}
           lang={lang}
+          assets={assets ?? []}
+          showFleet={fleetOn && Boolean(assets)}
           onBasemap={setBasemap}
         />
       )}
@@ -95,7 +106,8 @@ export function CityMap({ zones, states }: Props) {
       )}
 
       {google && ready && (
-        <div className="pointer-events-none absolute bottom-[152px] end-3.5 z-10 flex flex-col items-end gap-2">
+        <div className="pointer-events-none absolute end-3.5 z-10 flex flex-col items-end gap-2" style={{ bottom: chromeBottom }}>
+          {assets && <FleetPill count={assets.length} on={fleetOn} toggle={() => setFleet(!fleetOn)} label={t(lang, "map_fleet")} />}
           {towerCount > 0 && (
             <button
               type="button"
@@ -116,7 +128,8 @@ export function CityMap({ zones, states }: Props) {
       )}
 
       {engine === "fallback" && (
-        <div className="pointer-events-none absolute bottom-[152px] end-3.5 z-10 flex flex-col items-end gap-2">
+        <div className="pointer-events-none absolute end-3.5 z-10 flex flex-col items-end gap-2" style={{ bottom: chromeBottom }}>
+          {assets && <FleetPill count={assets.length} on={fleetOn} toggle={() => setFleet(!fleetOn)} label={t(lang, "map_fleet")} />}
           <div className="status-pill text-fg-2">
             <Box size={13} className="text-accent" />
             {failure === "missing-key" ? t(lang, "map_3d_missing") : t(lang, "map_3d_error")}
@@ -130,5 +143,15 @@ export function CityMap({ zones, states }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+function FleetPill({ count, on, toggle, label }: { count: number; on: boolean; toggle: () => void; label: string }) {
+  return (
+    <button type="button" onClick={toggle} className="status-pill pointer-events-auto text-fg-2 transition-colors hover:text-fg">
+      <Truck size={13} className={on ? "text-accent" : "text-muted"} />
+      {label} · {count}
+      <span className={`ms-1 h-1.5 w-1.5 rounded-full ${on ? "bg-accent" : "bg-white/30"}`} />
+    </button>
   );
 }

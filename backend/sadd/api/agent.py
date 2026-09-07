@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from ..agent import plans, rafid
 from ..agent.context import Turn
 from ..db import query, query_one
-from ..rules import PlanRejected, validate_and_apply
+from ..rules import PlanRejected, stand_down, validate_and_apply
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 QATAR = ZoneInfo("Asia/Qatar")
@@ -30,6 +30,18 @@ class ChatRequest(BaseModel):
 
 class ApproveRequest(BaseModel):
     operator_id: str = Field("operator-01", min_length=2, max_length=64)
+
+
+class ProposeRequest(BaseModel):
+    objective: str = Field("minimise time-to-drain across flooded zones", min_length=3, max_length=300)
+    storm_multiplier: float = Field(1.0, ge=0.25, le=3.0)
+    tick: int | None = Field(None, ge=0)
+    lang: str = Field("en", pattern="^(en|ar)$")
+
+
+class StandDownRequest(BaseModel):
+    operator_id: str = Field("operator-01", min_length=2, max_length=64)
+    tick: int | None = Field(None, ge=0)
 
 
 def _turn(req: ChatRequest) -> Turn:
@@ -67,6 +79,23 @@ async def chat(req: ChatRequest) -> StreamingResponse:
     return StreamingResponse(
         gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
     )
+
+
+@router.post("/plans/propose")
+def propose_plan(req: ProposeRequest) -> dict:
+    """The Simulation Lab's "Ask Rafid to optimise": Rafid's planner tool called directly (the deterministic
+    greedy optimiser over the what-if engine), so the plan card appears in well under a second and even when
+    Gemini is offline. Same plan object, same R-05 gate, same APPROVE click — the agent never applies it."""
+    return plans.propose(req.objective, req.storm_multiplier, req.tick, req.lang)
+
+
+@router.post("/fleet/stand-down")
+def fleet_stand_down(req: StandDownRequest) -> dict:
+    """R-08: the operator returns every unit to its depot (idle). Logged with the operator id."""
+    try:
+        return stand_down(req.operator_id, tick=req.tick)
+    except PlanRejected as exc:
+        raise HTTPException(422, {"errors": exc.errors}) from exc
 
 
 @router.get("/plans/{plan_id}")

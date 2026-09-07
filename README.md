@@ -21,7 +21,7 @@ photorealistic building mesh does not cover Qatar yet; the same element lights u
 |-----|-----|--------------------|
 | 1 — **Replay** | Command Center | 15–17 April 2024. Press play: rain climbs, zones turn yellow → orange → red on the 3D city, the rules engine fires alerts into the feed, the KPI strip moves. *"In 2024 the response was reactive."* |
 | 2 — **Live** | Command Center | Flip the toggle: today's real Doha weather (Open-Meteo, no key), calm green city. Proves the pipeline is real. |
-| 3 — **Simulate** | Simulation Lab | Storm ×1.5, pump-fleet allocator, Rafid proposes a plan, the operator **approves**, pumps move, time-to-drain drops. *(Phase 4)* |
+| 3 — **Simulate** | Simulation Lab | Storm ×1.5, pump-fleet allocator, Rafid proposes a plan, the operator **approves**, pumps move on the map, time-to-drain drops. Then Response & Governance shows the ledger and the Executive View shows the money. |
 
 ## Why it matters
 
@@ -122,10 +122,15 @@ writes a `decision_log` row with the exact inputs snapshot the rule saw. Phase 1
 | R-01 v1.0 | risk ≥ 80 for 2 consecutive intervals → RED alert + advisory draft |
 | R-03 v1.0 | RED + underpass zone → action item: close underpass, divert traffic |
 | R-07 v1.0 | active alert AND risk < 40 for 60 min → clear + stand-down message |
+| R-04 v1.0 | forecast risk ≥ 60 within 6 h AND no trucks staged → PRE-POSITION recommendation (ledger only) |
+| R-05 v1.0 | *gate* — validates an agent-proposed plan (zones exist, integers, total ≤ fleet, zones at yellow+ or recommended) before an operator's APPROVE applies it |
+| R-08 v1.0 | *gate* — operator stand-down: every unit back to its depot, logged with the operator id |
 
-R-04 (forecast pre-positioning) and R-05 (agent plan validation) arrive with the forecast model
-and the agent. The agent can only *propose*; the single path to changing asset state is
-`rules.validate_and_apply(plan, operator_id)` after an operator clicks APPROVE.
+The agent can only *propose*. The two paths that touch asset state both live in
+`backend/sadd/rules/dispatch.py`: `validate_and_apply(plan, operator_id)` after an operator
+clicks APPROVE (R-05) and `stand_down(operator_id)` (R-08). Nothing else writes `assets`.
+The Governance tab lists every rule with its version, kind (timeline / gate) and the number of
+pytest functions that exercise it, counted from the test sources at request time.
 
 ## Repository
 
@@ -146,10 +151,10 @@ and the agent. The agent can only *propose*; the single path to changing asset s
 | Phase | Deliverable | Status |
 |---|---|---|
 | P1 | scaffold · schema + seed · 3D map with risk-coloured zones · KPI strip · alert feed · replay scrubber · live mode · rules R-01/02/03/06/07 · AR/EN RTL | **done** |
-| P2 | trained models · server-driven replay engine · R-04 · reactive-2024 fleet animation | next |
-| P3 | flood-forecasting-mcp · MCP Toolbox · Rafid (6 tools, streaming, citations, approval flow) | |
-| P4 | Simulation Lab · Response & Governance · Executive · polish | |
-| P5 | rehearsal fixes only | |
+| P2 | XGBoost nowcast + time-to-drain models · what-if engine · model-scored replay | **done** |
+| P3 | flood-forecasting-mcp · MCP Toolbox · Rafid (6 tools, streaming, citations, approval flow) · R-04 / R-05 | **done** |
+| P4 | Simulation Lab · Response & Governance · Executive · fleet pins · R-08 | **done** |
+| P5 | rehearsal fixes only | next |
 
 ---
 *Fictional operations center for demonstration. Uses Google APIs; not endorsed by or affiliated with Google or any government entity.*
@@ -192,6 +197,35 @@ text). Without `GEMINI_API_KEY` the panel stays an honest shell. Rule **R-04** n
 replay: a pre-position recommendation hours before a zone's first orange alert, from a look-ahead
 labelled "perfect foresight" in the ledger. GCP: the same ADK code on Vertex AI Agent Engine, the
 Toolbox source pointed at BigQuery, Vertex AI Search for the corpus.
+
+## The other three tabs (Day 4)
+
+**Simulation Lab** (Act 3). A control rail drives one stateless what-if per change
+(`POST /api/sim/simulate`, ~25 ms): storm intensity 50–200 % of April 2024, the two preparedness
+toggles (pre-positioned assets = trucks staged 6 h earlier on the R-04 forecast; drain network
++20 %), and a per-zone pump allocator with time-to-drain recomputed live from the
+gradient-boosted model. The map is lit by *peak* risk under the scenario and says so. **Ask Rafid
+to optimise** calls Rafid's planner tool directly (`POST /api/agent/plans/propose` — the same
+deterministic optimiser the agent uses, so the card appears in well under a second and without
+Gemini). The plan card shows the trace line, the per-zone trucks and the before → after
+time-to-drain; **APPROVE** goes through R-05, moves the trucks (they glide to their zones on
+every map engine) and becomes the scenario, so the all-clear readout visibly drops.
+
+**Response & Governance.** The dispatch board (24 pump trucks + 8 tankers, status filters, a
+fictional duty roster, a **Stand down fleet** button that runs R-08), a live asset map, the
+versioned rule catalog with per-rule test counts, and **the decision log**: an immutable-looking
+ledger of every alert, action item, recommendation, dispatch, rejection and stand-down —
+timestamp, rule id + version, the inputs snapshot the rule saw, proposer (system / Rafid /
+operator), approver and whether a notification went out. Click a row for the raw
+`inputs_json` / `output_json`. Filters by type, rule, zone and proposer.
+
+**Executive View.** The §1 KPIs as scorecards and an *April 2024 as it happened* vs *with SADD*
+comparison (`GET /api/executive`). Both sides run the same fleet and the same greedy allocation
+through the what-if engine; the only difference is posture — reactive (trucks roll 6 h after a
+zone floods) versus prepared (staged on the R-04 recommendation). Alert lead time and the
+population protected come from the rules ledger over the replay. Rafid's one-line summary is a
+template rewritten by Gemini when a key is present, labelled either way; the numbers never come
+from the model. Built with recharts — the GCP version is a Looker Studio embed over BigQuery.
 
 ## Risk-lit towers (why the 3D buildings are ours)
 

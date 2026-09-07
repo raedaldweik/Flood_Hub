@@ -39,6 +39,12 @@ interface UiState {
   /** Risk-lit towers layer on the 3D map (OpenStreetMap footprints, lit by zone risk). */
   towers: boolean;
   setTowers: (on: boolean) => void;
+  /** Pump-truck / tanker markers on the map (positions come from /api/assets; only rules move them). */
+  fleet: boolean;
+  setFleet: (on: boolean) => void;
+  /** A tab asking Rafid something on the operator's behalf (e.g. "explain this plan"); the panel sends it. */
+  rafidAsk: { n: number; text: string };
+  askRafid: (text: string) => void;
 
   rafidOpen: boolean;
   setRafidOpen: (o: boolean) => void;
@@ -79,6 +85,10 @@ export const useUi = create<UiState>((set) => ({
   requestSkyline: () => set((s) => ({ selectedZone: null, skylineRequest: s.skylineRequest + 1 })),
   towers: true,
   setTowers: (towers) => set({ towers }),
+  fleet: true,
+  setFleet: (fleet) => set({ fleet }),
+  rafidAsk: { n: 0, text: "" },
+  askRafid: (text) => set((s) => ({ rafidAsk: { n: s.rafidAsk.n + 1, text }, rafidOpen: true })),
 
   rafidOpen: true,
   setRafidOpen: (rafidOpen) => set({ rafidOpen }),

@@ -12,10 +12,10 @@ import { DataModePill } from "@/components/command/DataModePill";
 import type { Meta } from "@/lib/api";
 
 const TABS = [
-  { href: "/", key: "tab_command", phase: null },
-  { href: "/simulation", key: "tab_simulation", phase: 4 },
-  { href: "/response", key: "tab_response", phase: 4 },
-  { href: "/executive", key: "tab_executive", phase: 4 },
+  { href: "/", key: "tab_command" },
+  { href: "/simulation", key: "tab_simulation" },
+  { href: "/response", key: "tab_response" },
+  { href: "/executive", key: "tab_executive" },
 ] as const;
 
 export function Header({ meta }: { meta?: Meta }) {
@@ -55,11 +55,6 @@ export function Header({ meta }: { meta?: Meta }) {
             return (
               <Link key={tab.href} href={tab.href} className={clsx("flex items-center gap-2", active && "on")}>
                 {t(lang, tab.key)}
-                {tab.phase && (
-                  <span className="rounded-md bg-white/[0.06] px-1.5 py-px font-mono text-[9.5px] font-bold text-muted ring-1 ring-line">
-                    P{tab.phase}
-                  </span>
-                )}
               </Link>
             );
           })}

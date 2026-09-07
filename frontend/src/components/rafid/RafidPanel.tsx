@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useSWRConfig } from "swr";
-import { BookOpen, Bot, Check, ChevronLeft, ChevronRight, Database, Gauge, Info, MessageSquareText, Route, SendHorizontal, ShieldCheck, Waves, Wrench } from "lucide-react";
-import { useAgentStatus } from "@/hooks/useData";
+import { BookOpen, Bot, ChevronLeft, ChevronRight, Database, Gauge, Info, MessageSquareText, Route, SendHorizontal, Waves, Wrench } from "lucide-react";
+import { useAgentStatus, useZones } from "@/hooks/useData";
 import { approvePlan, endpoints, streamChat, type AdvisoryDraft, type Citation, type DispatchPlan } from "@/lib/api";
 import { t, type Lang, type TKey } from "@/lib/i18n";
 import { useUi } from "@/lib/store";
+import { PlanCard } from "./PlanCard";
 
 interface TraceLine {
   name: string;
@@ -85,7 +86,10 @@ export function RafidPanel() {
   const open = useUi((s) => s.rafidOpen);
   const setOpen = useUi((s) => s.setRafidOpen);
   const { data: status } = useAgentStatus();
+  const { data: zones } = useZones();
+  const ask = useUi((s) => s.rafidAsk);
   const { mutate } = useSWRConfig();
+  const zoneNames = Object.fromEntries((zones?.features ?? []).map((z) => [z.properties.id, lang === "ar" ? z.properties.name_ar : z.properties.name_en]));
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -135,12 +139,23 @@ export function RafidPanel() {
     }
   };
 
+  // Another tab asked Rafid something on the operator's behalf (Simulation Lab, Executive View).
+  const lastAsk = useRef(0);
+  useEffect(() => {
+    if (ask.n && ask.n !== lastAsk.current) {
+      lastAsk.current = ask.n;
+      void send(ask.text);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ask.n]);
+
   const approve = async (plan: DispatchPlan) => {
     setMsgs((all) => all.map((m) => (m.plan?.plan_id === plan.plan_id ? { ...m, plan: { ...m.plan, status: "proposed", result: undefined, approving: true } as DispatchPlan & { approving?: boolean } } : m)));
     try {
       const res = await approvePlan(plan.plan_id);
       setMsgs((all) => all.map((m) => (m.plan?.plan_id === plan.plan_id ? { ...m, plan: { ...m.plan, status: "approved", result: res.result } } : m)));
       void mutate(endpoints.assets);
+      void mutate(endpoints.decisions);
     } catch (err) {
       setMsgs((all) => all.map((m) => (m.plan?.plan_id === plan.plan_id ? { ...m, plan: { ...m.plan, status: "rejected" }, error: err instanceof Error ? err.message : String(err) } : m)));
     }
@@ -265,7 +280,7 @@ export function RafidPanel() {
                   ))}
                 </div>
               )}
-              {m.plan && <PlanCard plan={m.plan} lang={lang} onApprove={() => approve(m.plan!)} />}
+              {m.plan && <PlanCard plan={m.plan} lang={lang} names={zoneNames} onApprove={() => approve(m.plan!)} />}
               {m.draft && <DraftCard draft={m.draft} lang={lang} />}
               {m.error && <div className="rounded-lg bg-red/10 px-3 py-2 text-[11.5px] text-red ring-1 ring-red/30">{t(lang, "rafid_error")}: {m.error}</div>}
             </div>
@@ -306,50 +321,6 @@ function dedupe(items: Citation[]): Citation[] {
     seen.add(k);
     return true;
   });
-}
-
-function PlanCard({ plan, lang, onApprove }: { plan: DispatchPlan & { approving?: boolean }; lang: Lang; onApprove: () => void }) {
-  const approved = plan.status === "approved";
-  const rejected = plan.status === "rejected";
-  const rows = [...plan.zones].sort((a, b) => b.pumps - a.pumps);
-  const dmg = plan.delta.damage_qar ?? 0;
-  return (
-    <div className="glass-inset overflow-hidden">
-      <div className="flex items-center gap-2 border-b border-line px-3 py-2">
-        <Route size={13} className="text-accent" />
-        <span className="text-[11.5px] font-extrabold">{t(lang, "rafid_plan_title")}</span>
-        <span className="ms-auto font-mono text-[10px] text-muted">#{plan.plan_id}</span>
-      </div>
-      <ul className="divide-y divide-line/60 px-3 py-1">
-        {rows.map((z) => (
-          <li key={z.zone_id} className="flex items-center gap-2 py-1.5 text-[11.5px]">
-            <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: `var(--${z.peak_band})` }} />
-            <span className="min-w-0 flex-1 truncate font-semibold text-fg-2">{z.zone_id.replace(/_/g, " ")}</span>
-            <span className="font-mono text-[11px] text-fg">{z.pumps} {t(lang, "rafid_trucks")}</span>
-            <span className="w-[74px] text-end font-mono text-[10.5px] text-muted">{z.baseline_time_to_drain_h.toFixed(1)}→{z.time_to_drain_h.toFixed(1)} h</span>
-          </li>
-        ))}
-      </ul>
-      <div className="grid grid-cols-2 gap-2 border-t border-line px-3 py-2 text-[11px]">
-        <div><span className="text-muted">{t(lang, "rafid_all_clear")}</span> <span className="font-mono font-bold text-fg">{plan.expected.all_clear_h?.toFixed(1)} h</span> <span className="text-muted">({t(lang, "rafid_baseline")} {plan.baseline.all_clear_h?.toFixed(1)} h)</span></div>
-        <div className="text-end"><span className="text-muted">{t(lang, "rafid_damage")}</span> <span className={clsx("font-mono font-bold", dmg < 0 ? "text-green" : "text-fg")}>{dmg < 0 ? "−" : "+"}{Math.abs(dmg / 1e6).toFixed(2)}M QAR</span></div>
-      </div>
-      <div className="flex items-center gap-2 border-t border-line px-3 py-2">
-        {approved ? (
-          <span className="flex items-center gap-1.5 text-[11px] font-bold text-green"><Check size={13} /> {t(lang, "rafid_approved")} · {plan.result?.trucks_moved} {t(lang, "rafid_trucks")} · {plan.result?.rule} · #{plan.result?.decision_id}</span>
-        ) : rejected ? (
-          <span className="text-[11px] font-bold text-red">{t(lang, "rafid_rejected")}</span>
-        ) : (
-          <>
-            <span className="min-w-0 flex-1 text-[10.5px] leading-snug text-muted">{t(lang, "rafid_plan_note")}</span>
-            <button onClick={onApprove} disabled={plan.approving} className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-extrabold text-[#06121a] transition hover:brightness-110 disabled:opacity-60" style={{ background: "var(--cyan-grad)" }}>
-              <ShieldCheck size={13} /> {plan.approving ? t(lang, "rafid_approving") : t(lang, "rafid_approve")}
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
 }
 
 function DraftCard({ draft, lang }: { draft: AdvisoryDraft; lang: Lang }) {

@@ -33,6 +33,7 @@ RUN chmod +x /usr/local/bin/toolbox
 COPY backend/toolbox /app/backend/toolbox
 COPY backend/start.sh /app/backend/start.sh
 COPY backend/sql /app/backend/sql
+COPY backend/tests /app/backend/tests
 # Train the risk nowcast + time-to-drain models (deterministic, a few seconds).
 RUN cd /app/backend && python -m sadd.models.train
 COPY data /app/data

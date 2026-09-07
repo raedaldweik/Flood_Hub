@@ -562,3 +562,207 @@ gmp-map-3d,
 *::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.03); }
 *::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); border-radius: 5px; }
 *::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
+
+/* ═══ Fleet pins (pump trucks / tankers on every map engine) ═════════════ */
+.fleet-pin {
+  --pin: #8d98ad;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  color: var(--pin);
+  background: rgba(7, 11, 21, 0.86);
+  border: 2px solid var(--pin);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 12px color-mix(in srgb, var(--pin) 55%, transparent), 0 2px 8px rgba(0, 0, 0, 0.5);
+  cursor: default;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.fleet-pin:hover {
+  transform: scale(1.15);
+  z-index: 5;
+}
+.fleet-pin .p-drop { display: none; }
+.fleet-pin[data-type="tanker"] { width: 18px; height: 18px; }
+.fleet-pin[data-type="tanker"] .p-truck { display: none; }
+.fleet-pin[data-type="tanker"] .p-drop { display: block; }
+.fleet-pin[data-status="idle"] { opacity: 0.72; }
+.fleet-pin[data-status="enroute"]::before,
+.fleet-pin[data-status="pumping"]::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  border: 2px solid var(--pin);
+  animation: fleet-ring 1.6s ease-out infinite;
+}
+@keyframes fleet-ring {
+  0%   { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(2.1); opacity: 0; }
+}
+.fleet-pin .fleet-tag {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, 3px);
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: #fff;
+  background: rgba(7, 11, 21, 0.85);
+  border: 1px solid color-mix(in srgb, var(--pin) 60%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+.fleet-pin:hover .fleet-tag,
+.fleet-pin[data-status="staged"] .fleet-tag,
+.fleet-pin[data-status="enroute"] .fleet-tag,
+.fleet-pin[data-status="pumping"] .fleet-tag {
+  opacity: 1;
+}
+.maplibregl-marker .fleet-pin { pointer-events: auto; }
+
+/* ═══ Scenario controls (Simulation Lab) ═════════════════════════════════ */
+input[type="range"].slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  outline: none;
+  margin: 10px 0;
+  background: linear-gradient(90deg, var(--cyan) var(--pct, 50%), rgba(255, 255, 255, 0.10) var(--pct, 50%));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+html[dir="rtl"] input[type="range"].slider {
+  background: linear-gradient(270deg, var(--cyan) var(--pct, 50%), rgba(255, 255, 255, 0.10) var(--pct, 50%));
+}
+input[type="range"].slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #fff;
+  border: 4px solid var(--cyan);
+  box-shadow: 0 0 0 5px rgba(34, 211, 238, 0.18), 0 2px 10px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+input[type="range"].slider::-webkit-slider-thumb:hover { transform: scale(1.1); }
+input[type="range"].slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: 4px solid var(--cyan);
+  box-shadow: 0 0 0 5px rgba(34, 211, 238, 0.18), 0 2px 10px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+}
+.switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  flex: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid var(--hairline);
+  transition: background 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  inset-inline-start: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+.switch.on {
+  background: rgba(34, 211, 238, 0.35);
+  border-color: rgba(34, 211, 238, 0.6);
+}
+.switch.on::after {
+  background: #fff;
+  transform: translateX(18px);
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+}
+html[dir="rtl"] .switch.on::after { transform: translateX(-18px); }
+.stepper {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  color: var(--ink-2);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--hairline);
+  transition: all 0.12s ease;
+}
+.stepper:hover:not(:disabled) { background: var(--cyan); color: #06121a; border-color: var(--cyan); }
+.stepper:disabled { opacity: 0.3; cursor: not-allowed; }
+.trace-step {
+  display: flex;
+  gap: 8px;
+  padding: 7px 12px;
+}
+.trace-step + .trace-step { border-top: 1px solid rgba(34, 211, 238, 0.10); }
+
+/* ═══ Ledger table (Response & Governance) ═══════════════════════════════ */
+.ledger th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 10px;
+  text-align: start;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  background: rgba(12, 18, 34, 0.96);
+  border-bottom: 1px solid var(--hairline);
+  white-space: nowrap;
+}
+html[dir="rtl"] .ledger th { letter-spacing: 0; }
+.ledger td {
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  vertical-align: middle;
+}
+.ledger tr.row:hover td { background: rgba(255, 255, 255, 0.035); }
+.ledger tr.open td { background: rgba(34, 211, 238, 0.05); }
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--tag, var(--ink-2));
+  background: color-mix(in srgb, var(--tag, #8d98ad) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tag, #8d98ad) 40%, transparent);
+}
+html[dir="rtl"] .tag { letter-spacing: 0; }
+.select {
+  padding: 6px 10px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--hairline);
+  outline: none;
+}
+.select option { background: #0f1729; }

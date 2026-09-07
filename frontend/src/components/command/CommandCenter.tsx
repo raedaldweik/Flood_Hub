@@ -78,7 +78,7 @@ export function CommandCenter() {
         <KpiStrip kpis={kpis} series={mode === "replay" ? timeline?.kpis : undefined} tick={tick} fleetSize={assets?.length ?? 32} redZones={redZones} />
 
         <div className="glass-hero relative min-h-0 flex-1 overflow-hidden rounded-[18px] ring-1 ring-line">
-          {zones ? <CityMap zones={zones.features} states={zoneNow} /> : <div className="backdrop absolute inset-0" />}
+          {zones ? <CityMap zones={zones.features} states={zoneNow} assets={assets ?? []} /> : <div className="backdrop absolute inset-0" />}
 
           <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between p-3.5">
             <div className="flex items-start justify-between">

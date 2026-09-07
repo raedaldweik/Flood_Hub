@@ -281,6 +281,117 @@ export interface AdvisoryDraft {
   note: string;
 }
 
+export interface Depot {
+  id: string;
+  name_en: string;
+  name_ar: string;
+  lat: number;
+  lng: number;
+}
+
+/** POST /api/sim/simulate — the Simulation Lab's what-if request (mirrors ScenarioIn). */
+export interface ScenarioIn {
+  storm_multiplier: number;
+  allocations: Record<string, number>;
+  prepositioned: boolean;
+  drain_upgrade_pct: number;
+}
+
+export interface SimZone {
+  zone_id: string;
+  pumps: number;
+  peak_risk: number;
+  peak_band: Band;
+  peak_depth_cm: number;
+  flooded_h: number;
+  first_flood_tick: number | null;
+  time_to_drain_h: number;
+  damage_qar: number;
+  population: number;
+  has_underpass: boolean;
+}
+
+export interface SimKpis {
+  zones_flooded: number;
+  zones_red: number;
+  zones_at_risk: number;
+  all_clear_h: number;
+  total_flooded_h: number;
+  population_affected: number;
+  roads_closed_km: number;
+  damage_qar: number;
+  pumps_deployed: number;
+}
+
+export interface SimResult {
+  scenario: ScenarioIn;
+  zones: SimZone[];
+  kpis: SimKpis;
+  baseline: SimKpis;
+  delta: SimKpis;
+  sources: { risk: string; time_to_drain: string };
+  assumptions: Record<string, unknown> & { note: string };
+  elapsed_ms: number;
+  fleet_size?: number;
+}
+
+export interface Rule {
+  id: string;
+  version: string;
+  name_en: string;
+  name_ar: string;
+  description_en: string;
+  description_ar: string;
+  kind: "timeline" | "gate";
+  test_count: number;
+}
+
+export type Proposer = "system" | "agent" | "operator";
+
+/** One row of the decision ledger (decision_log). */
+export interface Decision {
+  id: number;
+  ts: string;
+  tick: number | null;
+  decision_type: string;
+  zone_id: string | null;
+  rule_id: string;
+  rule_version: string;
+  inputs_json: Record<string, unknown>;
+  output_json: Record<string, unknown>;
+  proposed_by: Proposer;
+  approved_by: string | null;
+  notified: boolean;
+  source: string;
+}
+
+export interface Pair<T = number> {
+  actual: T;
+  sadd: T;
+}
+
+export interface ExecutiveReport {
+  event: { start_ts: string | null; end_ts: string | null; peak_ts: string | null; rain_source: string | null; city_rain_total_mm: number };
+  scorecards: {
+    alert_lead_time_min: Pair;
+    preposition_lead_time_min: Pair;
+    time_to_drain_h: Pair;
+    population_protected: Pair;
+    road_closure_h: Pair & { km_affected: number };
+    avoided_damage_qar: Pair;
+    asset_utilisation_pct: Pair & { live: number };
+  };
+  comparison: { key: string; actual: number; sadd: number }[];
+  scenarios: { no_pumps: SimKpis; reactive: SimKpis; prepared: SimKpis; allocations: Record<string, number>; fleet_size: number; reactive_delay_h: number; sources: { risk: string; time_to_drain: string } };
+  lead: { alert_lead_time_min: number; preposition_lead_time_min: number; zones_flooded: number; zones_warned_before_flooding: number; population_protected: number; population_flooded_zones: number };
+  trend: { tick: number; ts: string; city_rain_mm_h: number; active_alerts: number; zones_at_risk: number; zones_flooded: number }[];
+  alerts: { total: number; by_severity: Record<string, number>; zones_alerted: number };
+  decisions: { total: number; by_rule: Record<string, number>; by_proposer: Record<string, number>; operator_approved: number };
+  fleet: { pump_trucks: number; pump_trucks_active: number; utilisation_pct: number; by_status: Record<string, number> };
+  summary: { text: string; source: "template" | "gemini"; model: string | null };
+  assumptions: { actual: string; sadd: string; damage: string; damage_constants: Record<string, number>; gcp: string };
+}
+
 /** One `data:` line of the /api/agent/chat stream. */
 export type ChatEvent =
   | { type: "tool_call"; name: string; args: Record<string, unknown> }
@@ -334,6 +445,33 @@ export async function approvePlan(planId: string, operatorId = "operator-01"): P
   return data;
 }
 
+async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail ?? data));
+  return data as T;
+}
+
+/** Stateless what-if (well under 300 ms on the backend, so sliders feel live). */
+export function simulate(scenario: ScenarioIn, signal?: AbortSignal): Promise<SimResult> {
+  return postJson<SimResult>("/api/sim/simulate", scenario, signal);
+}
+
+/** Rafid's planner tool called directly — deterministic, sub-second, works with Gemini offline. */
+export function proposePlan(body: { objective?: string; storm_multiplier: number; tick?: number | null; lang: "en" | "ar" }): Promise<DispatchPlan> {
+  return postJson<DispatchPlan>("/api/agent/plans/propose", body);
+}
+
+/** R-08: the operator returns every unit to its depot. */
+export function standDown(operatorId = "operator-01", tick?: number): Promise<{ decision_id: number; rule: string; units_returned: number; fleet_size: number }> {
+  return postJson("/api/agent/fleet/stand-down", { operator_id: operatorId, tick });
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -356,5 +494,10 @@ export const endpoints = {
   liveWeather: "/api/live/weather",
   liveState: "/api/live/state",
   agentStatus: "/api/agent/status",
+  depots: "/api/depots",
+  rules: "/api/rules",
+  decisions: "/api/decisions?limit=1000",
+  simBaseline: "/api/sim/baseline",
+  executive: (lang: "en" | "ar") => `/api/executive?lang=${lang}`,
   explain: (zoneId: string, tick: number) => `/api/zones/${zoneId}/explain?tick=${tick}`,
 } as const;
