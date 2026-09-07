@@ -5,7 +5,8 @@ import json
 from fastapi import APIRouter, HTTPException, Query
 
 from ..db import query, query_one
-from ..sim import ZoneParams, explain_risk
+from ..models import get_registry
+from ..sim import ZoneParams
 from ..sim.physics import band
 from .schemas import Contribution, ZoneCollection, ZoneExplanation, ZoneFeature, ZoneProperties
 
@@ -45,10 +46,11 @@ def explain_zone(zone_id: str, tick: int = Query(..., ge=0)) -> ZoneExplanation:
         drainage_capacity_mm_h=z["drainage_capacity_mm_per_h"], elevation_m=z["elevation_m"],
         has_underpass=z["has_underpass"],
     )
-    parts = explain_risk(p, st["rain_mm_h"], st["cum_3h_mm"], st["water_depth_cm"])
+    out = get_registry().risk_contributions(p, st["rain_mm_h"], st["cum_3h_mm"], st["water_depth_cm"])
     return ZoneExplanation(
         zone_id=zone_id, tick=tick, risk=st["risk_score"], band=band(st["risk_score"]),
-        contributions=[Contribution(driver=d, points=round(v, 1)) for d, v in parts],
+        source=out["source"], model_risk=out["risk"], baseline=out["baseline"],
+        contributions=[Contribution(**c) for c in out["contributions"]],
         inputs={
             "rain_mm_h": st["rain_mm_h"], "cum_3h_mm": st["cum_3h_mm"], "exceedance_mm_h": st["exceedance_mm_h"],
             "water_depth_cm": st["water_depth_cm"], "flooded": st["flooded"],

@@ -8,6 +8,7 @@ Pipeline (run once by `sadd.seed`):
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -70,12 +71,18 @@ def interpolate_ticks(hourly: list[float], tick_minutes: int) -> list[float]:
     return [round(float(v), 3) for v in np.interp(xs, mids, hourly)]
 
 
+Scorer = Callable[[ZoneParams, float, float, float], float]
+
+
 def build_timeline(
     start_ts: datetime,
     tick_minutes: int,
     zone_params: list[ZoneParams],
     zone_tick_rain: dict[str, list[float]],
+    scorer: Scorer | None = None,
 ) -> list[TickState]:
+    """`scorer(p, rain, cum3, depth) -> risk`; defaults to physics_v0, the seed passes the XGBoost nowcast."""
+    score = scorer or physics.risk_score
     dt_h = tick_minutes / 60.0
     window_3h = int(180 / tick_minutes)
     states: list[TickState] = []
@@ -96,7 +103,7 @@ def build_timeline(
                     exceedance_mm_h=round(physics.exceedance_mm_h(p, r), 2),
                     depth_cm=round(depth, 2),
                     flooded=depth >= physics.FLOOD_DEPTH_CM,
-                    risk=physics.risk_score(p, r, cum3, depth),
+                    risk=score(p, r, cum3, depth),
                 )
             )
     return states

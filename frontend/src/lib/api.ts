@@ -129,6 +129,10 @@ export interface ZoneExplanation {
   tick: number;
   risk: number;
   band: Band;
+  /** Who produced the contributions: the XGBoost nowcast (TreeSHAP) or the physics baseline. */
+  source: string;
+  model_risk: number | null;
+  baseline: number | null;
   contributions: Contribution[];
   inputs: Record<string, number | boolean>;
 }
@@ -154,6 +158,11 @@ export interface Meta {
     flood_depth_cm: number;
     bands: { yellow: number; orange: number; red: number };
     formula: string;
+  };
+  models: {
+    available: boolean;
+    risk: { source: string; metrics?: { r2: number; mae: number }; importances?: Record<string, number> };
+    time_to_drain: { source: string; metrics?: { r2: number; mae_h: number }; formula: string };
   };
   features: { gemini: boolean; flood_mcp_live: boolean };
   disclaimers: { en: string; ar: string };

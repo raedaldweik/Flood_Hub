@@ -12,6 +12,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # Seed inputs (geojson, storm csv, fleet, protocols). Overridable so a packaged install
 # (Docker image) can point at /app/data regardless of where the package itself lives.
 DATA_DIR = Path(os.environ.get("SADD_DATA_DIR", REPO_ROOT / "data"))
+# Trained model artifacts (joblib). `make train` writes them; the Docker build trains them.
+ARTIFACTS_DIR = Path(os.environ.get("SADD_ARTIFACTS_DIR", Path(__file__).resolve().parents[1] / "artifacts"))
 
 
 class Settings(BaseSettings):

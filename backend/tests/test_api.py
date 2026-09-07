@@ -51,4 +51,22 @@ def test_explain(client):
     z = client.get("/api/zones").json()["features"][0]["properties"]["id"]
     peak = client.get("/api/replay/meta").json()["peak_tick"]
     e = client.get(f"/api/zones/{z}/explain", params={"tick": peak}).json()
-    assert abs(sum(c["points"] for c in e["contributions"]) - e["risk"]) < 0.6
+    assert e["source"] in ("xgb_nowcast_v1", "physics_v0")
+    # TreeSHAP contributions + baseline reproduce the scorer's risk; the physics fallback sums exactly.
+    assert abs((e["baseline"] or 0) + sum(c["points"] for c in e["contributions"]) - e["model_risk"]) < 0.6
+
+
+def test_models_and_sim(client):
+    info = client.get("/api/models").json()
+    assert info["risk"]["source"] in ("xgb_nowcast_v1", "physics_v0")
+    zone = client.get("/api/zones").json()["features"][0]["properties"]["id"]
+    s = client.post("/api/models/score", json={"zone_id": zone, "rain_multiplier": 2.0}).json()
+    assert 0 <= s["risk"] <= 100 and s["band"] in ("green", "yellow", "orange", "red") and s["contributions"]
+    base = client.get("/api/sim/baseline").json()
+    assert base["kpis"]["zones_flooded"] >= 1 and base["elapsed_ms"] < 300
+    r = client.post(
+        "/api/sim/simulate", json={"storm_multiplier": 1.5, "allocations": {zone: 3}, "prepositioned": True}
+    ).json()
+    assert r["kpis"]["pumps_deployed"] == 3 and r["fleet_size"] >= 3 and "delta" in r
+    bad = client.post("/api/sim/simulate", json={"allocations": {zone: 999}})
+    assert bad.status_code == 422

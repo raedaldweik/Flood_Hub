@@ -121,6 +121,9 @@ class ZoneExplanation(BaseModel):
     tick: int
     risk: float
     band: str
+    source: str = "physics_v0"  # who produced the contributions: xgb_nowcast_v1 (TreeSHAP) or physics_v0
+    model_risk: float | None = None  # the scorer's own risk for these inputs (== risk when it scored the replay)
+    baseline: float | None = None  # TreeSHAP expected value; 0 for physics
     contributions: list[Contribution]
     inputs: dict[str, float | bool]
 
@@ -133,6 +136,7 @@ class Meta(BaseModel):
     replay: ReplayMeta | None
     counts: dict[str, int]
     physics: dict[str, Any]
+    models: dict[str, Any]  # registry status: which model scored the replay, metrics, importances
     features: dict[str, bool]
     disclaimers: dict[str, str]
 

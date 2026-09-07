@@ -154,6 +154,24 @@ and the agent. The agent can only *propose*; the single path to changing asset s
 ---
 *Fictional operations center for demonstration. Uses Google APIs; not endorsed by or affiliated with Google or any government entity.*
 
+## Models and the what-if engine (Day 2)
+
+Two real trained models, reproduced by `make train` in a few seconds (the Docker build does it):
+
+* **Risk nowcast** — XGBoost on rain intensity, 3-hour accumulation, drainage capacity, imperviousness,
+  elevation and underpass; labels from the transparent `physics_v0` runoff formula plus noise
+  (holdout R² ≈ 0.98). It scores every tick of the April-2024 replay, and the zone card's "why is
+  this zone red" shows its TreeSHAP contributions next to the physics drivers it learned from.
+* **Time-to-drain** — gradient-boosted regressor around the hotspot mass balance
+  `hours ≈ volume ÷ (pumps + local drainage − inflow)` (holdout R² ≈ 0.99). Pumps act where water
+  collects — an 8,000 m² underpass basin — which is why a truck matters at an underpass and barely
+  registers on a zone average.
+* **What-if** — `POST /api/sim/simulate` takes the storm multiplier, pump trucks per zone and the two
+  preparedness toggles and returns per-zone peak risk, depth, flooded hours and time-to-drain plus KPI
+  deltas against the untouched baseline, in ~20 ms. `GET /api/models` reports which model scored the
+  replay, its metrics and importances; with no artifacts everything falls back to the formulas and
+  says so. Damage figures are illustrative constants and are labelled as such in the response.
+
 ## Risk-lit towers (why the 3D buildings are ours)
 
 Google's Photorealistic 3D Tiles do not cover Qatar, so `Map3DElement` draws satellite imagery on

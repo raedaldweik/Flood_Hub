@@ -97,6 +97,11 @@ export function ZoneCard({ zone, now, alerts, assets }: Props) {
         <div className="flex items-center gap-3">
           <span className="panel-title">{t(lang, "zone_why")}</span>
           <span className="accent-line" />
+          {explain && (
+            <span className="chip text-[9.5px]" title={explain.source}>
+              {explain.source.startsWith("xgb") ? t(lang, "why_model") : t(lang, "why_physics")}
+            </span>
+          )}
           <span className="group relative">
             <Info size={12} className="text-muted" />
             <span className="pointer-events-none absolute end-0 top-5 z-20 hidden w-64 rounded-lg border border-line bg-panel-solid p-2.5 text-[11px] leading-snug text-fg-2 shadow-xl group-hover:block">

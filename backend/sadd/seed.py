@@ -27,8 +27,9 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from .config import DATA_DIR, get_settings
+from .models import get_registry
 from .rules import evaluate_timeline
-from .sim import RISK_SOURCE, ZoneParams, build_timeline, distribute_rain, interpolate_ticks
+from .sim import ZoneParams, build_timeline, distribute_rain, interpolate_ticks
 from .sim.replay import TickState
 
 QATAR = ZoneInfo("Asia/Qatar")
@@ -141,7 +142,10 @@ def precompute_replay(
     per_zone_hourly = distribute_rain(hourly, {z["id"]: z["rain_factor"] for z in zones})
     params = [zone_params(z) for z in zones]
     zone_tick_rain = {zid: interpolate_ticks(series, tick_min) for zid, series in per_zone_hourly.items()}
-    states = build_timeline(start_ts, tick_min, params, zone_tick_rain)
+    registry = get_registry()
+    risk_source = registry.risk_source
+    states = build_timeline(start_ts, tick_min, params, zone_tick_rain, scorer=registry.risk_score)
+    log(f"risk scored by {risk_source}")
     n_ticks = len(zone_tick_rain[zones[0]["id"]])
     city_ticks = interpolate_ticks(hourly, tick_min)
 
@@ -167,7 +171,7 @@ def precompute_replay(
                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
             [
                 (st.tick, st.ts, st.zone_id, st.rain_mm_h, st.cum_3h_mm, st.exceedance_mm_h,
-                 st.depth_cm, st.flooded, st.risk, RISK_SOURCE)
+                 st.depth_cm, st.flooded, st.risk, risk_source)
                 for st in states
             ],
         )
@@ -177,7 +181,7 @@ def precompute_replay(
                  (id, start_ts, end_ts, tick_minutes, n_ticks, peak_tick, rain_source, risk_source)
                VALUES (1, %s, %s, %s, %s, %s, %s, %s)""",
             (start_ts, start_ts + timedelta(minutes=(n_ticks - 1) * tick_min), tick_min, n_ticks, peak_tick,
-             rain_source, RISK_SOURCE),
+             rain_source, risk_source),
         )
     log(f"replay: {n_ticks} ticks × {len(zones)} zones = {len(states)} states (peak tick {peak_tick})")
 

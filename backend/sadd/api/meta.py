@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from .. import __version__
 from ..config import get_settings
 from ..db import ping, query
+from ..models import get_registry
 from ..sim.physics import describe
 from ..startup import STATE
 from .replay import get_meta
@@ -36,7 +37,7 @@ def meta() -> Meta:
         replay = get_meta()
     return Meta(
         app="PROJECT SADD", version=__version__, database_ok=db_ok, startup=STATE.snapshot(), replay=replay,
-        counts=counts, physics=describe(),
+        counts=counts, physics=describe(), models=get_registry().info(),
         features={
             "gemini": bool(s.gemini_api_key),
             "flood_mcp_live": s.flood_mcp_backend == "live",

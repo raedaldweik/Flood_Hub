@@ -27,6 +27,8 @@ COPY backend/sadd /app/backend/sadd
 # Editable install: the package stays at /app/backend/sadd so sql/ and data/ resolve by path.
 RUN pip install --upgrade pip && pip install -e /app/backend
 COPY backend/sql /app/backend/sql
+# Train the risk nowcast + time-to-drain models (deterministic, a few seconds).
+RUN cd /app/backend && python -m sadd.models.train
 COPY data /app/data
 # Risk-lit towers: OpenStreetMap footprints with heights for central Doha (sadd/buildings.py).
 # Best effort — an unreachable Overpass API means no towers, never a failed build.
