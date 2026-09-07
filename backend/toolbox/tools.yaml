@@ -1,0 +1,105 @@
+# MCP Toolbox for Databases — Rafid's situational `db` toolset over Postgres (read-only queries).
+# GCP swap: point the source at BigQuery (kind: bigquery) and keep the tool names — the agent code
+# does not change. Environment variables are filled by backend/start.sh from DATABASE_URL.
+sources:
+  sadd-pg:
+    kind: postgres
+    host: ${PGHOST}
+    port: ${PGPORT}
+    database: ${PGDATABASE}
+    user: ${PGUSER}
+    password: ${PGPASSWORD}
+
+tools:
+  get_zone_status:
+    kind: postgres-sql
+    source: sadd-pg
+    description: >
+      State of one zone at a replay tick: rain, 3 h accumulation, hotspot depth, flooded flag, risk score
+      and the zone's attributes. tick = minutes since 15 April 2024 00:00 Doha / 10.
+    parameters:
+      - name: zone_id
+        type: string
+        description: zone id, e.g. najma, west_bay, al_sadd
+      - name: tick
+        type: integer
+        description: replay tick (10-minute steps)
+    statement: |
+      SELECT z.id, z.name_en, z.name_ar, z.population, z.has_underpass, z.drainage_capacity_mm_per_h, z.criticality,
+             f.tick, f.ts, f.rain_mm_h, f.cum_3h_mm, f.exceedance_mm_h, f.water_depth_cm, f.flooded, f.risk_score,
+             f.risk_source
+      FROM zones z JOIN flood_state f ON f.zone_id = z.id
+      WHERE z.id = $1 AND f.tick = $2;
+
+  list_zones_at_risk:
+    kind: postgres-sql
+    source: sadd-pg
+    description: Zones with risk score >= min_risk at a replay tick, highest first, with population.
+    parameters:
+      - name: tick
+        type: integer
+        description: replay tick (10-minute steps)
+      - name: min_risk
+        type: float
+        description: minimum risk score (40 yellow, 60 orange, 80 red)
+    statement: |
+      SELECT z.id, z.name_en, z.name_ar, z.population, z.has_underpass, f.risk_score, f.water_depth_cm, f.flooded,
+             f.rain_mm_h
+      FROM flood_state f JOIN zones z ON z.id = f.zone_id
+      WHERE f.tick = $1 AND f.risk_score >= $2
+      ORDER BY f.risk_score DESC;
+
+  get_active_alerts:
+    kind: postgres-sql
+    source: sadd-pg
+    description: Alerts active at a replay tick with severity, type, zone, rule id/version and message.
+    parameters:
+      - name: tick
+        type: integer
+        description: replay tick (10-minute steps)
+    statement: |
+      SELECT a.id, a.tick, a.zone_id, z.name_en, a.severity, a.type, a.rule_id, a.rule_version, a.message_en, a.message_ar
+      FROM alerts a JOIN zones z ON z.id = a.zone_id
+      WHERE a.tick <= $1 AND (a.cleared_tick IS NULL OR a.cleared_tick > $1)
+      ORDER BY a.tick DESC;
+
+  get_kpis:
+    kind: postgres-sql
+    source: sadd-pg
+    description: Operational KPIs at a replay tick (active alerts, zones at risk / flooded, population affected, lead time).
+    parameters:
+      - name: tick
+        type: integer
+        description: replay tick (10-minute steps)
+    statement: SELECT * FROM replay_kpis WHERE tick = $1;
+
+  get_decision_log:
+    kind: postgres-sql
+    source: sadd-pg
+    description: Most recent decision-log entries (rule id + version, proposer, approver, decision, message).
+    parameters:
+      - name: limit
+        type: integer
+        description: number of entries (1-50)
+    statement: |
+      SELECT id, ts, tick, decision_type, zone_id, rule_id, rule_version, proposed_by, approved_by, notified,
+             output_json->>'message_en' AS message_en
+      FROM decision_log ORDER BY ts DESC, id DESC LIMIT LEAST(GREATEST($1, 1), 50);
+
+  get_assets:
+    kind: postgres-sql
+    source: sadd-pg
+    description: The pump-truck and tanker fleet with status (idle / staged / enroute / pumping), depot and assigned zone.
+    parameters: []
+    statement: |
+      SELECT a.id, a.callsign, a.type, a.capacity_m3_h, a.status, a.zone_id, d.name_en AS depot
+      FROM assets a LEFT JOIN depots d ON d.id = a.depot_id ORDER BY a.type, a.id;
+
+toolsets:
+  sadd:
+    - get_zone_status
+    - list_zones_at_risk
+    - get_active_alerts
+    - get_kpis
+    - get_decision_log
+    - get_assets

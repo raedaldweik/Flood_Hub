@@ -23,6 +23,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import httpx
+import numpy as np
 import psycopg
 from psycopg.types.json import Jsonb
 
@@ -58,12 +59,18 @@ def load_zones(conn: psycopg.Connection) -> list[dict]:
                         %(has_underpass)s, %(criticality)s, %(rain_factor)s, %(notes)s)
                 """,
                 {
-                    "id": p["id"], "name_en": p["name_en"], "name_ar": p["name_ar"],
-                    "geom": json.dumps(f["geometry"]), "elevation_m": p["elevation_m"],
+                    "id": p["id"],
+                    "name_en": p["name_en"],
+                    "name_ar": p["name_ar"],
+                    "geom": json.dumps(f["geometry"]),
+                    "elevation_m": p["elevation_m"],
                     "imperviousness_pct": p["imperviousness_pct"],
-                    "drainage": p["drainage_capacity_mm_per_h"], "population": p["population"],
-                    "has_underpass": p["has_underpass"], "criticality": p["criticality"],
-                    "rain_factor": p.get("rain_factor", 1.0), "notes": p.get("notes"),
+                    "drainage": p["drainage_capacity_mm_per_h"],
+                    "population": p["population"],
+                    "has_underpass": p["has_underpass"],
+                    "criticality": p["criticality"],
+                    "rain_factor": p.get("rain_factor", 1.0),
+                    "notes": p.get("notes"),
                 },
             )
         cur.execute("SELECT * FROM zones ORDER BY id")
@@ -78,9 +85,12 @@ def fetch_open_meteo(start: date, end: date, lat: float, lng: float) -> list[tup
         r = httpx.get(
             OPEN_METEO_ARCHIVE,
             params={
-                "latitude": lat, "longitude": lng,
-                "start_date": start.isoformat(), "end_date": end.isoformat(),
-                "hourly": "precipitation", "timezone": "Asia/Qatar",
+                "latitude": lat,
+                "longitude": lng,
+                "start_date": start.isoformat(),
+                "end_date": end.isoformat(),
+                "hourly": "precipitation",
+                "timezone": "Asia/Qatar",
             },
             timeout=20,
         )
@@ -102,17 +112,17 @@ def fetch_open_meteo(start: date, end: date, lat: float, lng: float) -> list[tup
 def load_fallback_csv() -> list[tuple[datetime, float]]:
     path = DATA_DIR / "storm" / "april_2024_doha_hourly_fallback.csv"
     with path.open(encoding="utf-8") as f:
-        return [
-            (datetime.fromisoformat(row["ts"]), float(row["precipitation_mm"])) for row in csv.DictReader(f)
-        ]
+        return [(datetime.fromisoformat(row["ts"]), float(row["precipitation_mm"])) for row in csv.DictReader(f)]
 
 
 def get_city_rain() -> tuple[list[tuple[datetime, float]], str]:
     s = get_settings()
     if not s.seed_force_fallback:
         series = fetch_open_meteo(
-            date.fromisoformat(s.replay_start_date), date.fromisoformat(s.replay_end_date),
-            s.open_meteo_lat, s.open_meteo_lng,
+            date.fromisoformat(s.replay_start_date),
+            date.fromisoformat(s.replay_end_date),
+            s.open_meteo_lat,
+            s.open_meteo_lng,
         )
         if series:
             log(f"rain: open-meteo archive, {len(series)} hourly rows, total {sum(v for _, v in series):.1f} mm")
@@ -125,9 +135,13 @@ def get_city_rain() -> tuple[list[tuple[datetime, float]], str]:
 # ── 3–6. replay precompute ───────────────────────────────────────────────────
 def zone_params(z: dict) -> ZoneParams:
     return ZoneParams(
-        zone_id=z["id"], imperviousness_pct=z["imperviousness_pct"],
-        drainage_capacity_mm_h=z["drainage_capacity_mm_per_h"], elevation_m=z["elevation_m"],
-        has_underpass=z["has_underpass"], area_km2=z["area_km2"], population=z["population"],
+        zone_id=z["id"],
+        imperviousness_pct=z["imperviousness_pct"],
+        drainage_capacity_mm_h=z["drainage_capacity_mm_per_h"],
+        elevation_m=z["elevation_m"],
+        has_underpass=z["has_underpass"],
+        area_km2=z["area_km2"],
+        population=z["population"],
         criticality=z["criticality"],
     )
 
@@ -170,8 +184,18 @@ def precompute_replay(
                                         water_depth_cm, flooded, risk_score, risk_source)
                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
             [
-                (st.tick, st.ts, st.zone_id, st.rain_mm_h, st.cum_3h_mm, st.exceedance_mm_h,
-                 st.depth_cm, st.flooded, st.risk, risk_source)
+                (
+                    st.tick,
+                    st.ts,
+                    st.zone_id,
+                    st.rain_mm_h,
+                    st.cum_3h_mm,
+                    st.exceedance_mm_h,
+                    st.depth_cm,
+                    st.flooded,
+                    st.risk,
+                    risk_source,
+                )
                 for st in states
             ],
         )
@@ -180,28 +204,49 @@ def precompute_replay(
             """INSERT INTO replay_meta
                  (id, start_ts, end_ts, tick_minutes, n_ticks, peak_tick, rain_source, risk_source)
                VALUES (1, %s, %s, %s, %s, %s, %s, %s)""",
-            (start_ts, start_ts + timedelta(minutes=(n_ticks - 1) * tick_min), tick_min, n_ticks, peak_tick,
-             rain_source, risk_source),
+            (
+                start_ts,
+                start_ts + timedelta(minutes=(n_ticks - 1) * tick_min),
+                tick_min,
+                n_ticks,
+                peak_tick,
+                rain_source,
+                risk_source,
+            ),
         )
     log(f"replay: {n_ticks} ticks × {len(zones)} zones = {len(states)} states (peak tick {peak_tick})")
 
     # 5. rules engine → alerts + decision_log
     meta = {
         z["id"]: {
-            "name_en": z["name_en"], "name_ar": z["name_ar"], "has_underpass": z["has_underpass"],
+            "name_en": z["name_en"],
+            "name_ar": z["name_ar"],
+            "has_underpass": z["has_underpass"],
             "drainage_capacity_mm_h": z["drainage_capacity_mm_per_h"],
         }
         for z in zones
     }
-    out = evaluate_timeline(states, meta)
+    out = evaluate_timeline(states, meta, tick_minutes=tick_min)
     with conn.cursor() as cur:
         cur.executemany(
             """INSERT INTO alerts (ts, tick, zone_id, severity, type, message_en, message_ar, rule_id, rule_version,
                                    status, cleared_ts, cleared_tick, source)
                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'replay_2024')""",
             [
-                (a.ts, a.tick, a.zone_id, a.severity, a.alert_type, a.message_en, a.message_ar, a.rule_id,
-                 a.rule_version, a.status, a.cleared_ts, a.cleared_tick)
+                (
+                    a.ts,
+                    a.tick,
+                    a.zone_id,
+                    a.severity,
+                    a.alert_type,
+                    a.message_en,
+                    a.message_ar,
+                    a.rule_id,
+                    a.rule_version,
+                    a.status,
+                    a.cleared_ts,
+                    a.cleared_tick,
+                )
                 for a in out.alerts
             ],
         )
@@ -210,8 +255,19 @@ def precompute_replay(
                                          output_json, proposed_by, approved_by, notified, source)
                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'replay_2024')""",
             [
-                (d.ts, d.tick, d.decision_type, d.zone_id, d.rule_id, d.rule_version, Jsonb(d.inputs),
-                 Jsonb(d.output), d.proposed_by, d.approved_by, d.notified)
+                (
+                    d.ts,
+                    d.tick,
+                    d.decision_type,
+                    d.zone_id,
+                    d.rule_id,
+                    d.rule_version,
+                    Jsonb(d.inputs),
+                    Jsonb(d.output),
+                    d.proposed_by,
+                    d.approved_by,
+                    d.notified,
+                )
                 for d in out.decisions
             ],
         )
@@ -231,6 +287,7 @@ def precompute_replay(
             kpis,
         )
     log(f"kpis: {len(kpis)} ticks; max zones at risk {max(k[2] for k in kpis)}, max flooded {max(k[3] for k in kpis)}")
+    return states
 
 
 def compute_kpis(states: list[TickState], alerts, zones: list[dict], n_ticks: int) -> list[tuple]:
@@ -258,11 +315,17 @@ def compute_kpis(states: list[TickState], alerts, zones: list[dict], n_ticks: in
             for z in first_flood
             if first_flood[z] <= t and z in first_alert and first_alert[z] <= first_flood[z]
         ]
-        rows.append((
-            t, active, len(at_risk), sum(1 for z in zs if z.flooded), 0,  # assets_deployed animates in Phase 2
-            sum(pop[z.zone_id] for z in at_risk),
-            round(sum(leads) / len(leads), 1) if leads else None,
-        ))
+        rows.append(
+            (
+                t,
+                active,
+                len(at_risk),
+                sum(1 for z in zs if z.flooded),
+                0,  # assets_deployed animates in Phase 2
+                sum(pop[z.zone_id] for z in at_risk),
+                round(sum(leads) / len(leads), 1) if leads else None,
+            )
+        )
     return rows
 
 
@@ -286,10 +349,20 @@ def load_assets(conn: psycopg.Connection) -> None:
             lat = d["lat"] + ((n % 4) - 1.5) * 0.0009
             lng = d["lng"] + ((n // 4) - 1.0) * 0.0011
             num = a["id"].split("-")[1]
-            rows.append((
-                a["id"], f"{prefix[a['type']]['en']}-{num}", f"{prefix[a['type']]['ar']}-{num}", a["type"],
-                a["capacity_m3_h"], round(lat, 6), round(lng, 6), a["depot"], None, "idle",
-            ))
+            rows.append(
+                (
+                    a["id"],
+                    f"{prefix[a['type']]['en']}-{num}",
+                    f"{prefix[a['type']]['ar']}-{num}",
+                    a["type"],
+                    a["capacity_m3_h"],
+                    round(lat, 6),
+                    round(lng, 6),
+                    a["depot"],
+                    None,
+                    "idle",
+                )
+            )
         cur.executemany(
             """INSERT INTO assets (id, callsign, callsign_ar, type, capacity_m3_h, lat, lng, depot_id, zone_id, status)
                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
@@ -307,13 +380,13 @@ def chunk_document(text: str) -> tuple[dict, list[tuple[str, str, str]]]:
     fm_match = FRONT_MATTER.match(text)
     meta = dict(line.split(":", 1) for line in fm_match.group(1).splitlines()) if fm_match else {}
     meta = {k.strip(): v.strip() for k, v in meta.items()}
-    body = text[fm_match.end():] if fm_match else text
+    body = text[fm_match.end() :] if fm_match else text
     body = body.split("\n---\n")[0]  # drop the fictional-document footer
     chunks = []
     matches = list(SECTION.finditer(body))
     for i, m in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
-        content = body[m.start():end].strip()
+        content = body[m.start() : end].strip()
         chunks.append((m.group(1), m.group(2).strip(), content))
     return meta, chunks
 
@@ -334,8 +407,21 @@ def load_protocols(conn: psycopg.Connection) -> None:
     log(f"protocols: {len(rows)} section chunks (embeddings in Phase 3)")
 
 
-# ── 9. virtual gauges ────────────────────────────────────────────────────────
-def load_gauges(conn: psycopg.Connection, zones: list[dict]) -> None:
+# ── 9. virtual gauges + forecasts (backing tables for flood-forecasting-mcp) ──────────
+def _forecast_severity(depth_cm: float) -> str:
+    """Mirrors flood_forecasting_mcp.contract thresholds (0.15 / 0.30 / 0.50 m)."""
+    if depth_cm >= 50:
+        return "EXTREME"
+    if depth_cm >= 30:
+        return "SEVERE"
+    if depth_cm >= 15:
+        return "ABOVE_NORMAL"
+    return "NO_FLOODING"
+
+
+def load_gauges(
+    conn: psycopg.Connection, zones: list[dict], states: list[TickState] | None = None, tick_min: int = 10
+) -> None:
     with conn.cursor() as cur:
         cur.execute("SELECT id, name_en, ST_Y(ST_Centroid(geom)) AS lat, ST_X(ST_Centroid(geom)) AS lng FROM zones")
         rows = cur.fetchall()
@@ -344,12 +430,46 @@ def load_gauges(conn: psycopg.Connection, zones: list[dict]) -> None:
             [(f"DOHA-{r['id'].upper()}", f"{r['name_en']} virtual gauge", r["lat"], r["lng"], r["id"]) for r in rows],
         )
     log(f"gauges: {len(rows)} virtual gauges")
+    if not states:
+        return
+    # Hourly issued forecasts of hotspot depth for the next 12 h, taken from the replay with ±15 % noise
+    # (a simulated forecaster that is right about the shape and a little wrong about the numbers).
+    by_zone: dict[str, list[TickState]] = {}
+    for st in states:
+        by_zone.setdefault(st.zone_id, []).append(st)
+    per_hour = max(1, 60 // tick_min)
+    rng = np.random.default_rng(3)
+    frows = []
+    for zid, sts in by_zone.items():
+        sts.sort(key=lambda x: x.tick)
+        n = len(sts)
+        for issue in range(0, n, per_hour):
+            for lead in range(1, 13):
+                t = min(n - 1, issue + lead * per_hour)
+                value = max(0.0, sts[t].depth_cm * float(rng.uniform(0.85, 1.15)))
+                frows.append((f"DOHA-{zid.upper()}", sts[issue].ts, lead, round(value, 1), _forecast_severity(value)))
+    with conn.cursor() as cur:
+        cur.executemany(
+            "INSERT INTO gauge_forecasts (gauge_id, issued_ts, lead_h, value, severity) VALUES (%s,%s,%s,%s,%s)", frows
+        )
+    log(f"gauge forecasts: {len(frows)} rows ({len(by_zone)} gauges × hourly issues × 12 h leads)")
 
 
 # ── main ─────────────────────────────────────────────────────────────────────
 TABLES_IN_DELETE_ORDER = [
-    "gauge_forecasts", "gauges", "protocol_chunks", "replay_kpis", "decision_log", "alerts",
-    "assets", "depots", "flood_state", "replay_ticks", "replay_meta", "rain_readings", "zones",
+    "gauge_forecasts",
+    "gauges",
+    "protocol_chunks",
+    "replay_kpis",
+    "decision_log",
+    "alerts",
+    "assets",
+    "depots",
+    "flood_state",
+    "replay_ticks",
+    "replay_meta",
+    "rain_readings",
+    "zones",
 ]
 
 
@@ -365,10 +485,10 @@ def run() -> None:
                 cur.execute(f"DELETE FROM {t}")
         zones = load_zones(conn)
         city, rain_source = get_city_rain()
-        precompute_replay(conn, zones, city, rain_source)
+        states = precompute_replay(conn, zones, city, rain_source)
         load_assets(conn)
         load_protocols(conn)
-        load_gauges(conn, zones)
+        load_gauges(conn, zones, states, s.replay_tick_minutes)
         conn.commit()
     log("done")
 

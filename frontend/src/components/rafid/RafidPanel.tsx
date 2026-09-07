@@ -2,14 +2,28 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { BookOpen, Bot, ChevronLeft, ChevronRight, Database, Gauge, Info, MessageSquareText, Route, SendHorizontal, Waves } from "lucide-react";
+import { useSWRConfig } from "swr";
+import { BookOpen, Bot, Check, ChevronLeft, ChevronRight, Database, Gauge, Info, MessageSquareText, Route, SendHorizontal, ShieldCheck, Waves, Wrench } from "lucide-react";
 import { useAgentStatus } from "@/hooks/useData";
-import { t, type TKey } from "@/lib/i18n";
+import { approvePlan, endpoints, streamChat, type AdvisoryDraft, type Citation, type DispatchPlan } from "@/lib/api";
+import { t, type Lang, type TKey } from "@/lib/i18n";
 import { useUi } from "@/lib/store";
+
+interface TraceLine {
+  name: string;
+  args?: Record<string, unknown>;
+  summary?: string;
+}
 
 interface Msg {
   role: "user" | "rafid";
   text: string;
+  trace: TraceLine[];
+  citations: Citation[];
+  plan?: DispatchPlan;
+  draft?: AdvisoryDraft;
+  error?: string;
+  streaming?: boolean;
 }
 
 const CAPS: { icon: typeof Bot; key: TKey; tag: TKey }[] = [
@@ -28,35 +42,108 @@ const PROMPTS: { key: TKey; tag: TKey }[] = [
   { key: "rafid_p4", tag: "rafid_tag_draft" },
 ];
 
+/** Where a tool lives, for the visible trace ("Rafid used: flood-mcp → …"). */
+function toolSource(name: string, db: "toolbox" | "local"): string {
+  if (name.startsWith("flood_")) return "flood-mcp";
+  if (["score_zone"].includes(name)) return "model";
+  if (name === "search_protocols") return "RAG";
+  if (name === "propose_dispatch_plan") return "planner";
+  if (name === "draft_advisory") return "draft";
+  return db === "toolbox" ? "MCP Toolbox" : "db";
+}
+
+function fmtArgs(args?: Record<string, unknown>): string {
+  if (!args) return "";
+  const parts = Object.entries(args)
+    .filter(([, v]) => v !== "" && v !== null && v !== undefined)
+    .map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`);
+  const s = parts.join(", ");
+  return s.length > 90 ? s.slice(0, 87) + "…" : s;
+}
+
+function sessionId(): string {
+  try {
+    const key = "sadd_rafid_session";
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, "0")).join("");
+    localStorage.setItem(key, id);
+    return id;
+  } catch {
+    return "session-" + Math.random().toString(16).slice(2, 10);
+  }
+}
+
 /**
- * The agent dock (present on every tab). Phase 1 ships the shell with an honest offline state;
- * Phase 3 streams ADK + Gemini replies, tool-call traces and citation chips into this same panel.
+ * The agent dock (present on every tab): streams ADK + Gemini replies with a visible tool-call
+ * trace, citation chips, DRAFT advisories and dispatch-plan cards that need an operator's APPROVE.
  */
 export function RafidPanel() {
   const lang = useUi((s) => s.lang);
+  const tick = useUi((s) => s.tick);
+  const mode = useUi((s) => s.mode);
   const open = useUi((s) => s.rafidOpen);
   const setOpen = useUi((s) => s.setRafidOpen);
   const { data: status } = useAgentStatus();
+  const { mutate } = useSWRConfig();
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
-  const [thinking, setThinking] = useState(false);
+  const [busy, setBusy] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const online = status?.online ?? false;
+  const db = status?.tools?.db ?? "local";
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
-  }, [msgs, thinking]);
+  }, [msgs, busy]);
 
-  const send = (text: string) => {
-    if (!text.trim() || thinking) return;
-    setMsgs((m) => [...m, { role: "user", text }]);
+  const patchLast = (fn: (m: Msg) => Msg) =>
+    setMsgs((all) => {
+      const last = all[all.length - 1];
+      if (!last || last.role !== "rafid") return all;
+      return [...all.slice(0, -1), fn(last)];
+    });
+
+  const send = async (text: string) => {
+    const message = text.trim();
+    if (!message || busy) return;
     setDraft("");
-    setThinking(true);
-    // Offline build: the reply is a static notice (CLAUDE.md §11). Phase 3 replaces this with SSE.
-    setTimeout(() => {
-      setMsgs((m) => [...m, { role: "rafid", text: t(lang, "rafid_offline_reply") }]);
-      setThinking(false);
-    }, 900);
+    setBusy(true);
+    setMsgs((m) => [...m, { role: "user", text: message, trace: [], citations: [] }, { role: "rafid", text: "", trace: [], citations: [], streaming: true }]);
+    try {
+      for await (const ev of streamChat({ message, session_id: sessionId(), lang, tick, mode })) {
+        if (ev.type === "text") patchLast((m) => ({ ...m, text: m.text + ev.delta }));
+        else if (ev.type === "tool_call") patchLast((m) => ({ ...m, trace: [...m.trace, { name: ev.name, args: ev.args }] }));
+        else if (ev.type === "tool_result")
+          patchLast((m) => {
+            const i = m.trace.map((x) => x.name).lastIndexOf(ev.name);
+            const trace = [...m.trace];
+            if (i >= 0) trace[i] = { ...trace[i]!, summary: ev.summary };
+            else trace.push({ name: ev.name, summary: ev.summary });
+            return { ...m, trace };
+          });
+        else if (ev.type === "citations") patchLast((m) => ({ ...m, citations: dedupe([...m.citations, ...ev.items]) }));
+        else if (ev.type === "plan") patchLast((m) => ({ ...m, plan: ev.plan }));
+        else if (ev.type === "draft") patchLast((m) => ({ ...m, draft: ev.draft }));
+        else if (ev.type === "error") patchLast((m) => ({ ...m, error: ev.message }));
+      }
+    } catch (err) {
+      patchLast((m) => ({ ...m, error: err instanceof Error ? err.message : String(err) }));
+    } finally {
+      patchLast((m) => ({ ...m, streaming: false }));
+      setBusy(false);
+    }
+  };
+
+  const approve = async (plan: DispatchPlan) => {
+    setMsgs((all) => all.map((m) => (m.plan?.plan_id === plan.plan_id ? { ...m, plan: { ...m.plan, status: "proposed", result: undefined, approving: true } as DispatchPlan & { approving?: boolean } } : m)));
+    try {
+      const res = await approvePlan(plan.plan_id);
+      setMsgs((all) => all.map((m) => (m.plan?.plan_id === plan.plan_id ? { ...m, plan: { ...m.plan, status: "approved", result: res.result } } : m)));
+      void mutate(endpoints.assets);
+    } catch (err) {
+      setMsgs((all) => all.map((m) => (m.plan?.plan_id === plan.plan_id ? { ...m, plan: { ...m.plan, status: "rejected" }, error: err instanceof Error ? err.message : String(err) } : m)));
+    }
   };
 
   if (!open) {
@@ -88,6 +175,7 @@ export function RafidPanel() {
             <span className={clsx("dot", online ? "bg-green dot-pulse" : "bg-muted")} />
             {online ? t(lang, "rafid_online") : t(lang, "rafid_offline")}
             {online && status?.model && <span className="font-mono text-[10px] opacity-70">· {status.model}</span>}
+            {online && status?.tools && <span className="font-mono text-[10px] opacity-70">· {status.tools.db === "toolbox" ? "MCP Toolbox" : "local db"} · {status.tools.rag}</span>}
           </div>
         </div>
         <button onClick={() => setOpen(false)} className="btn-ghost ms-auto px-2" aria-label="Collapse">
@@ -96,29 +184,32 @@ export function RafidPanel() {
       </header>
 
       <div ref={scroller} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        <p className="text-[12.5px] leading-relaxed text-fg-2">{t(lang, "rafid_intro")}</p>
-
-        <div>
-          <div className="mb-2 flex items-center gap-3">
-            <span className="panel-title">{t(lang, "rafid_caps_title")}</span>
-            <span className="accent-line" />
-          </div>
-          <ul className="space-y-1.5">
-            {CAPS.map((c) => (
-              <li key={c.key} className="glass-inset flex items-center gap-2.5 px-2.5 py-2">
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-accent/12 text-accent ring-1 ring-accent/25"><c.icon size={13} /></span>
-                <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-fg-2">{t(lang, c.key)}</span>
-                <span className="trace-step-tool">{t(lang, c.tag)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        {msgs.length === 0 && (
+          <>
+            <p className="text-[12.5px] leading-relaxed text-fg-2">{t(lang, "rafid_intro")}</p>
+            <div>
+              <div className="mb-2 flex items-center gap-3">
+                <span className="panel-title">{t(lang, "rafid_caps_title")}</span>
+                <span className="accent-line" />
+              </div>
+              <ul className="space-y-1.5">
+                {CAPS.map((c) => (
+                  <li key={c.key} className="glass-inset flex items-center gap-2.5 px-2.5 py-2">
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-accent/12 text-accent ring-1 ring-accent/25"><c.icon size={13} /></span>
+                    <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-fg-2">{t(lang, c.key)}</span>
+                    <span className="trace-step-tool">{t(lang, c.tag)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
 
         <div>
           <div className="label mb-2">{t(lang, "rafid_try")}</div>
           <div className="flex flex-wrap gap-1.5">
             {PROMPTS.map((p) => (
-              <button key={p.key} onClick={() => send(t(lang, p.key))} className="chip">
+              <button key={p.key} onClick={() => send(t(lang, p.key))} disabled={busy} className="chip disabled:opacity-50">
                 <span className="chip-tag">{t(lang, p.tag)}</span>
                 {t(lang, p.key)}
               </button>
@@ -133,28 +224,59 @@ export function RafidPanel() {
             ) : (
               <div className="avatar-ring grid h-8 w-8 shrink-0 place-items-center text-[#06121a]"><Bot size={15} /></div>
             )}
-            <div className={clsx("max-w-[78%] px-3.5 py-2.5 text-[12.5px] leading-relaxed text-fg", m.role === "user" ? "msg-user-bubble" : "msg-bot-bubble")}>{m.text}</div>
-          </div>
-        ))}
-        {thinking && (
-          <div className="animate-fade-up flex gap-2.5">
-            <div className="avatar-ring grid h-8 w-8 shrink-0 place-items-center text-[#06121a]"><Bot size={15} /></div>
-            <div className="msg-bot-bubble flex min-w-[120px] items-center gap-2 px-3.5 py-3">
-              <span className="text-[11px] font-semibold text-muted">{t(lang, "rafid_thinking")}</span>
-              <span className="flex items-center gap-1">
-                {[0, 1, 2].map((j) => (
-                  <span key={j} className="h-1.5 w-1.5 rounded-full bg-accent" style={{ animation: `pop 1.4s ease-in-out infinite ${j * 0.15}s` }} />
-                ))}
-              </span>
+            <div className={clsx("min-w-0 max-w-[85%] space-y-2", m.role === "user" && "max-w-[78%]")}>
+              {m.trace.length > 0 && (
+                <div className="trace-panel">
+                  {m.trace.map((tr, k) => (
+                    <div key={k} className="trace-step">
+                      <Wrench size={11} className="mt-0.5 shrink-0 text-accent" />
+                      <div className="min-w-0 flex-1 text-[11px] leading-snug text-fg-2">
+                        <span className="font-semibold text-muted">{t(lang, "rafid_used")}:</span> <span className="trace-step-tool">{toolSource(tr.name, db)}</span> → <span className="font-mono text-[10.5px]">{tr.name.replace(/^flood_/, "")}({fmtArgs(tr.args)})</span>
+                        {tr.summary && <span className="block text-[10.5px] text-muted">↳ {tr.summary}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(m.text || m.role === "user") && (
+                <div className={clsx("whitespace-pre-wrap px-3.5 py-2.5 text-[12.5px] leading-relaxed text-fg", m.role === "user" ? "msg-user-bubble" : "msg-bot-bubble")} dir="auto">
+                  {m.text}
+                  {m.streaming && <span className="ms-0.5 inline-block h-3 w-1.5 animate-pulse rounded-sm bg-accent align-middle" />}
+                </div>
+              )}
+              {m.role === "rafid" && m.streaming && !m.text && (
+                <div className="msg-bot-bubble flex min-w-[120px] items-center gap-2 px-3.5 py-3">
+                  <span className="text-[11px] font-semibold text-muted">{t(lang, "rafid_thinking")}</span>
+                  <span className="flex items-center gap-1">
+                    {[0, 1, 2].map((j) => (
+                      <span key={j} className="h-1.5 w-1.5 rounded-full bg-accent" style={{ animation: `pop 1.4s ease-in-out infinite ${j * 0.15}s` }} />
+                    ))}
+                  </span>
+                </div>
+              )}
+              {m.citations.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="label">{t(lang, "rafid_sources")}</span>
+                  {m.citations.map((c) => (
+                    <span key={`${c.doc_id}-${c.section_no}-${c.lang}`} className="chip cursor-default" title={`${c.doc_title} — §${c.section_no} ${c.section}`}>
+                      <BookOpen size={11} className="text-accent" />
+                      {c.doc_id} §{c.section_no}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {m.plan && <PlanCard plan={m.plan} lang={lang} onApprove={() => approve(m.plan!)} />}
+              {m.draft && <DraftCard draft={m.draft} lang={lang} />}
+              {m.error && <div className="rounded-lg bg-red/10 px-3 py-2 text-[11.5px] text-red ring-1 ring-red/30">{t(lang, "rafid_error")}: {m.error}</div>}
             </div>
           </div>
-        )}
+        ))}
       </div>
 
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          send(draft);
+          void send(draft);
         }}
         className="border-t border-line p-3"
       >
@@ -162,15 +284,87 @@ export function RafidPanel() {
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder={t(lang, "rafid_placeholder")}
+            placeholder={online ? t(lang, "rafid_placeholder") : t(lang, "rafid_placeholder_offline")}
             className="min-w-0 flex-1 bg-transparent py-1.5 text-[12.5px] text-fg placeholder:text-muted focus:outline-none"
+            dir="auto"
           />
-          <button type="submit" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[#06121a] transition hover:brightness-110" style={{ background: "var(--cyan-grad)" }} aria-label={t(lang, "rafid_send")}>
+          <button type="submit" disabled={busy} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[#06121a] transition hover:brightness-110 disabled:opacity-50" style={{ background: "var(--cyan-grad)" }} aria-label={t(lang, "rafid_send")}>
             <SendHorizontal size={14} className="rtl:rotate-180" />
           </button>
         </div>
         <div className="mt-2 text-center text-[10px] font-semibold tracking-wide text-muted/80">{t(lang, "rafid_footer")}</div>
       </form>
     </aside>
+  );
+}
+
+function dedupe(items: Citation[]): Citation[] {
+  const seen = new Set<string>();
+  return items.filter((c) => {
+    const k = `${c.doc_id}|${c.section_no}|${c.lang}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+function PlanCard({ plan, lang, onApprove }: { plan: DispatchPlan & { approving?: boolean }; lang: Lang; onApprove: () => void }) {
+  const approved = plan.status === "approved";
+  const rejected = plan.status === "rejected";
+  const rows = [...plan.zones].sort((a, b) => b.pumps - a.pumps);
+  const dmg = plan.delta.damage_qar ?? 0;
+  return (
+    <div className="glass-inset overflow-hidden">
+      <div className="flex items-center gap-2 border-b border-line px-3 py-2">
+        <Route size={13} className="text-accent" />
+        <span className="text-[11.5px] font-extrabold">{t(lang, "rafid_plan_title")}</span>
+        <span className="ms-auto font-mono text-[10px] text-muted">#{plan.plan_id}</span>
+      </div>
+      <ul className="divide-y divide-line/60 px-3 py-1">
+        {rows.map((z) => (
+          <li key={z.zone_id} className="flex items-center gap-2 py-1.5 text-[11.5px]">
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: `var(--${z.peak_band})` }} />
+            <span className="min-w-0 flex-1 truncate font-semibold text-fg-2">{z.zone_id.replace(/_/g, " ")}</span>
+            <span className="font-mono text-[11px] text-fg">{z.pumps} {t(lang, "rafid_trucks")}</span>
+            <span className="w-[74px] text-end font-mono text-[10.5px] text-muted">{z.baseline_time_to_drain_h.toFixed(1)}→{z.time_to_drain_h.toFixed(1)} h</span>
+          </li>
+        ))}
+      </ul>
+      <div className="grid grid-cols-2 gap-2 border-t border-line px-3 py-2 text-[11px]">
+        <div><span className="text-muted">{t(lang, "rafid_all_clear")}</span> <span className="font-mono font-bold text-fg">{plan.expected.all_clear_h?.toFixed(1)} h</span> <span className="text-muted">({t(lang, "rafid_baseline")} {plan.baseline.all_clear_h?.toFixed(1)} h)</span></div>
+        <div className="text-end"><span className="text-muted">{t(lang, "rafid_damage")}</span> <span className={clsx("font-mono font-bold", dmg < 0 ? "text-green" : "text-fg")}>{dmg < 0 ? "−" : "+"}{Math.abs(dmg / 1e6).toFixed(2)}M QAR</span></div>
+      </div>
+      <div className="flex items-center gap-2 border-t border-line px-3 py-2">
+        {approved ? (
+          <span className="flex items-center gap-1.5 text-[11px] font-bold text-green"><Check size={13} /> {t(lang, "rafid_approved")} · {plan.result?.trucks_moved} {t(lang, "rafid_trucks")} · {plan.result?.rule} · #{plan.result?.decision_id}</span>
+        ) : rejected ? (
+          <span className="text-[11px] font-bold text-red">{t(lang, "rafid_rejected")}</span>
+        ) : (
+          <>
+            <span className="min-w-0 flex-1 text-[10.5px] leading-snug text-muted">{t(lang, "rafid_plan_note")}</span>
+            <button onClick={onApprove} disabled={plan.approving} className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-extrabold text-[#06121a] transition hover:brightness-110 disabled:opacity-60" style={{ background: "var(--cyan-grad)" }}>
+              <ShieldCheck size={13} /> {plan.approving ? t(lang, "rafid_approving") : t(lang, "rafid_approve")}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DraftCard({ draft, lang }: { draft: AdvisoryDraft; lang: Lang }) {
+  return (
+    <div className="glass-inset overflow-hidden">
+      <div className="flex items-center gap-2 border-b border-line px-3 py-2">
+        <MessageSquareText size={13} className="text-orange" />
+        <span className="text-[11.5px] font-extrabold text-orange">{t(lang, "rafid_draft")}</span>
+        <span className="ms-auto font-mono text-[10px] text-muted">{draft.template}</span>
+      </div>
+      <div className="space-y-2 px-3 py-2 text-[11.5px] leading-relaxed">
+        <p dir="ltr" className="text-fg"><span className="chip-tag me-1">EN · {draft.chars_en}</span>{draft.sms_en}</p>
+        <p dir="rtl" className="text-fg"><span className="chip-tag me-1">AR · {draft.chars_ar}</span>{draft.sms_ar}</p>
+        <p className="text-[10.5px] text-muted">{draft.note}</p>
+      </div>
+    </div>
   );
 }

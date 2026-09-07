@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flood-forecasting-mcp"
+version = "0.1.0"
+description = "MCP server built contract-first against Google's Flood Forecasting API: simulated gauges today, the live API with one environment variable when pilot access clears."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = ["mcp>=2.0", "psycopg[binary]>=3.2", "httpx>=0.27"]
+
+[project.scripts]
+flood-forecasting-mcp = "flood_forecasting_mcp.server:main"
+
+[tool.setuptools.packages.find]
+include = ["flood_forecasting_mcp*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"

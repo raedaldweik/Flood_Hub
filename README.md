@@ -172,6 +172,27 @@ Two real trained models, reproduced by `make train` in a few seconds (the Docker
   replay, its metrics and importances; with no artifacts everything falls back to the formulas and
   says so. Damage figures are illustrative constants and are labelled as such in the response.
 
+## Rafid, the agent (Day 3)
+
+Rafid (رافد, "tributary; one who supports") is a Google ADK agent on Gemini, docked on every tab.
+It explains, proposes and cites; it never executes. Six capabilities, each a tool the panel shows
+as a visible trace line ("Rafid used: flood-mcp → query_latest_flood_status(…)"):
+
+| Tool | Backed by |
+|---|---|
+| Situational Q&A (`get_zone_status`, `list_zones_at_risk`, `get_active_alerts`, `get_kpis`, `get_decision_log`, `get_assets`) | **MCP Toolbox for Databases** (`backend/toolbox/tools.yaml`) over Postgres; the same queries run as local tools if Toolbox is down |
+| Gauge status and forecasts | **flood-forecasting-mcp** — our MCP server built contract-first against Google's Flood Forecasting API, launched over stdio |
+| `score_zone` | the XGBoost nowcast with TreeSHAP contributions |
+| `search_protocols` | pgvector over Gemini embeddings when the corpus is embedded (`make embed`), Postgres keyword search otherwise — labelled either way |
+| `propose_dispatch_plan` | greedy allocation over the what-if engine, returned as a plan card that needs the operator's **APPROVE**; rule **R-05** validates and applies it and logs the operator id |
+| `draft_advisory` | bilingual SMS templates, returned marked **DRAFT**, never sent |
+
+`POST /api/agent/chat` streams server-sent events (tool calls, results, citations, plans, drafts,
+text). Without `GEMINI_API_KEY` the panel stays an honest shell. Rule **R-04** now also fires in the
+replay: a pre-position recommendation hours before a zone's first orange alert, from a look-ahead
+labelled "perfect foresight" in the ledger. GCP: the same ADK code on Vertex AI Agent Engine, the
+Toolbox source pointed at BigQuery, Vertex AI Search for the corpus.
+
 ## Risk-lit towers (why the 3D buildings are ours)
 
 Google's Photorealistic 3D Tiles do not cover Qatar, so `Map3DElement` draws satellite imagery on

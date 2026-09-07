@@ -37,7 +37,7 @@ app = FastAPI(
     description="Urban flood command & preparedness twin (fictional Doha Flood Operations Center).",
     lifespan=lifespan,
 )
-UNGATED = {"/api/health", "/api/meta", "/api/agent/status", "/api/buildings", "/api/models"}  # no database behind these
+UNGATED = {"/api/health", "/api/meta", "/api/agent/status", "/api/buildings", "/api/models"}  # no database needed
 
 
 @app.middleware("http")

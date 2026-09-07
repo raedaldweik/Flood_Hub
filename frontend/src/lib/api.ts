@@ -223,8 +223,115 @@ export interface AgentStatus {
   phase: number;
   gemini_key_present: boolean;
   model: string;
+  tools?: {
+    db: "toolbox" | "local";
+    toolbox_url: string;
+    flood_mcp: { transport: string; backend: string };
+    rag: "pgvector" | "keyword";
+    models: string;
+  };
   notice_en: string;
   notice_ar: string;
+}
+
+export interface Citation {
+  doc_id: string;
+  doc_title: string;
+  section_no: string;
+  section: string;
+  lang: string;
+}
+
+export interface PlanZone {
+  zone_id: string;
+  pumps: number;
+  peak_band: Band;
+  time_to_drain_h: number;
+  baseline_time_to_drain_h: number;
+  flooded_h: number;
+  population: number;
+}
+
+export interface DispatchPlan {
+  plan_id: string;
+  status: "proposed" | "approved" | "rejected";
+  objective: string;
+  tick: number | null;
+  storm_multiplier: number;
+  prepositioned: boolean;
+  fleet_size: number;
+  allocations: Record<string, number>;
+  zones: PlanZone[];
+  expected: Record<string, number>;
+  baseline: Record<string, number>;
+  delta: Record<string, number>;
+  rule: string;
+  result?: { decision_id: number; rule: string; approved_by: string; trucks_moved: number };
+}
+
+export interface AdvisoryDraft {
+  status: "DRAFT";
+  zone_id: string;
+  severity: string;
+  template: string;
+  sms_en: string;
+  sms_ar: string;
+  chars_en: number;
+  chars_ar: number;
+  note: string;
+}
+
+/** One `data:` line of the /api/agent/chat stream. */
+export type ChatEvent =
+  | { type: "tool_call"; name: string; args: Record<string, unknown> }
+  | { type: "tool_result"; name: string; summary: string }
+  | { type: "citations"; method: string; items: Citation[] }
+  | { type: "plan"; plan: DispatchPlan }
+  | { type: "draft"; draft: AdvisoryDraft }
+  | { type: "text"; delta: string }
+  | { type: "error"; message: string }
+  | { type: "done"; offline?: boolean };
+
+/** POST the chat turn and yield parsed SSE events (fetch streaming, same origin, no EventSource GET limits). */
+export async function* streamChat(body: {
+  message: string;
+  session_id: string;
+  lang: "en" | "ar";
+  tick: number;
+  mode: "replay" | "live";
+}): AsyncGenerator<ChatEvent> {
+  const res = await fetch(`${API_BASE}/api/agent/chat`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok || !res.body) throw new ApiError(res.status, `${res.status} ${res.statusText} for /api/agent/chat`);
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let idx: number;
+    while ((idx = buf.indexOf("\n\n")) >= 0) {
+      const chunk = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      const line = chunk.split("\n").find((l) => l.startsWith("data:"));
+      if (line) yield JSON.parse(line.slice(5).trim()) as ChatEvent;
+    }
+  }
+}
+
+export async function approvePlan(planId: string, operatorId = "operator-01"): Promise<{ plan_id: string; status: string; result: DispatchPlan["result"] }> {
+  const res = await fetch(`${API_BASE}/api/agent/plans/${planId}/approve`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ operator_id: operatorId }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new ApiError(res.status, JSON.stringify(data.detail ?? data));
+  return data;
 }
 
 export class ApiError extends Error {

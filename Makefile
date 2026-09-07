@@ -47,6 +47,13 @@ seed: ## load reference data + precompute the April-2024 replay
 buildings: ## fetch OpenStreetMap tower footprints for the risk-lit 3D layer (© OSM contributors)
 	cd backend && $(CURDIR)/$(PYBIN)/python -m sadd.buildings
 
+toolbox: ## run MCP Toolbox for Databases on :5000 (downloads the binary once into backend/.toolbox)
+	@test -x backend/.toolbox/toolbox || (mkdir -p backend/.toolbox && curl -sSL -o backend/.toolbox/toolbox https://storage.googleapis.com/genai-toolbox/v0.12.0/linux/amd64/toolbox && chmod +x backend/.toolbox/toolbox)
+	cd backend && PGHOST=localhost PGPORT=5432 PGDATABASE=sadd PGUSER=sadd PGPASSWORD=sadd ./.toolbox/toolbox --tools-file toolbox/tools.yaml --port 5000
+
+embed: ## embed the protocol corpus with Gemini (needs GEMINI_API_KEY)
+	cd backend && $(CURDIR)/$(PYBIN)/python -c "from sadd.agent.rag import embed_corpus; print(embed_corpus(), 'chunks embedded')"
+
 train: ## train risk + time-to-drain models (Phase 2)
 	cd backend && $(CURDIR)/$(PYBIN)/python -m sadd.models.train
 

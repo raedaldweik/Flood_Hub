@@ -35,3 +35,4 @@ data/cache/
 data/geojson/doha_buildings.geojson
 # trained model artifacts (make train / Docker build)
 backend/artifacts/
+backend/.toolbox/

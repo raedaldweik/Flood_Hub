@@ -24,8 +24,14 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1
 COPY backend/pyproject.toml /app/backend/pyproject.toml
 COPY backend/sadd /app/backend/sadd
-# Editable install: the package stays at /app/backend/sadd so sql/ and data/ resolve by path.
-RUN pip install --upgrade pip && pip install -e /app/backend
+COPY flood-forecasting-mcp /app/flood-forecasting-mcp
+# Editable installs: the packages stay in place so sql/ and data/ resolve by path.
+RUN pip install --upgrade pip && pip install -e /app/backend -e /app/flood-forecasting-mcp
+# MCP Toolbox for Databases (Google OSS) — Rafid's situational toolset over Postgres (start.sh runs it).
+ADD https://storage.googleapis.com/genai-toolbox/v0.12.0/linux/amd64/toolbox /usr/local/bin/toolbox
+RUN chmod +x /usr/local/bin/toolbox
+COPY backend/toolbox /app/backend/toolbox
+COPY backend/start.sh /app/backend/start.sh
 COPY backend/sql /app/backend/sql
 # Train the risk nowcast + time-to-drain models (deterministic, a few seconds).
 RUN cd /app/backend && python -m sadd.models.train
@@ -41,4 +47,4 @@ ENV FRONTEND_DIST=/app/frontend/out \
 WORKDIR /app/backend
 EXPOSE 8000
 # Railway forwards the public domain to the port in PORT; keep it 8000 everywhere (see docs/DEPLOY_RAILWAY.md).
-CMD ["sh", "-c", "uvicorn sadd.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]
+CMD ["sh", "/app/backend/start.sh"]

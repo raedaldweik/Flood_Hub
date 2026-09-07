@@ -126,7 +126,8 @@ def test_engine_escalates_yellow_orange_red_then_closes_underpass_then_clears():
     ]
     # all four alerts cleared by R-07 at tick 10 (6 ticks below 40: ticks 5..10)
     assert all(a.cleared_tick == 10 for a in out.alerts)
-    assert [d.rule_id for d in out.decisions] == ["R-06", "R-02", "R-01", "R-03", "R-07"]
+    assert [d.rule_id for d in out.decisions if d.rule_id != "R-04"] == ["R-06", "R-02", "R-01", "R-03", "R-07"]
+    assert "R-04" in [d.rule_id for d in out.decisions]  # the pre-position advice is in the ledger too
     assert all(d.inputs["zone_id"] == "najma" and "risk" in d.inputs for d in out.decisions)
 
 

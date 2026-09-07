@@ -4,9 +4,9 @@ Adding a rule = add a class, register it in RULES, add tests. Changing a thresho
 `version`. The decision log records id + version + the exact inputs, so any historical
 decision can be replayed against the code that made it.
 
-Phase 1 ships the zone-risk ladder (R-06 yellow → R-02 orange → R-01 red), the underpass
-closure action item (R-03) and the clear-down rule (R-07). R-04 (forecast pre-positioning)
-and R-05 (agent plan validation) arrive with the forecast model and the agent (Phases 2–3).
+The zone-risk ladder (R-06 yellow → R-02 orange → R-01 red), the underpass closure action
+item (R-03), the clear-down rule (R-07), forecast pre-positioning (R-04) and agent plan
+validation (R-05 — the only gate through which an agent proposal can touch asset state).
 """
 
 from __future__ import annotations
@@ -44,10 +44,14 @@ class RuleInputs:
     drainage_capacity_mm_h: float
     flooded: bool
     has_underpass: bool
-    consecutive_ge_red: int      # ticks (incl. current) with risk ≥ RED_THRESHOLD
+    consecutive_ge_red: int  # ticks (incl. current) with risk ≥ RED_THRESHOLD
     consecutive_below_clear: int  # ticks (incl. current) with risk < CLEAR_BELOW
     active_level: Severity | None  # currently active alert level for the zone
     open_action_items: tuple[str, ...] = ()  # alert types of action items already open for the zone
+    forecast_risk_6h: float | None = None  # max forecast risk over the next 6 h (None = no forecast)
+    forecast_source: str = ""  # where the forecast came from (replay look-ahead, gauge forecast, …)
+    staged_assets: int = 0  # pump trucks staged / en route / pumping in the zone
+    open_recommendations: tuple[str, ...] = ()  # recommendation types already issued for the zone
 
     def snapshot(self) -> dict:
         d = asdict(self)
@@ -100,8 +104,7 @@ class R01RedAlert:
         "→ RED alert + public advisory draft (template FOC-TPL-06 §5)."
     )
     description_ar = (
-        f"خطورة ≥ {RED_THRESHOLD:.0f} لفترتين متتاليتين → تنبيه أحمر ومسودة إرشاد عام "
-        "(القالب FOC-TPL-06 §5)."
+        f"خطورة ≥ {RED_THRESHOLD:.0f} لفترتين متتاليتين → تنبيه أحمر ومسودة إرشاد عام (القالب FOC-TPL-06 §5)."
     )
 
     def evaluate(self, x: RuleInputs) -> Decision | None:
@@ -109,8 +112,12 @@ class R01RedAlert:
             return None
         f = _fmt(x)
         return Decision(
-            rule_id=self.id, rule_version=self.version, decision_type="alert",
-            zone_id=x.zone_id, severity="red", alert_type="zone_risk",
+            rule_id=self.id,
+            rule_version=self.version,
+            decision_type="alert",
+            zone_id=x.zone_id,
+            severity="red",
+            alert_type="zone_risk",
             message_en=(
                 f"RED ALERT — {x.zone_name_en}: risk {f['risk']}. Rain {f['rain']} mm/h against "
                 f"{f['drain']} mm/h drainage; est. {f['depth']} cm at the low point."
@@ -120,8 +127,10 @@ class R01RedAlert:
                 f"صرف {f['drain']} مم/س؛ منسوب مقدر {f['depth']} سم عند النقطة المنخفضة."
             ),
             output={
-                "threshold": RED_THRESHOLD, "consecutive_required": RED_CONSECUTIVE_TICKS,
-                "advisory_template": "FOC-TPL-06 §5", "advisory_status": "DRAFT",
+                "threshold": RED_THRESHOLD,
+                "consecutive_required": RED_CONSECUTIVE_TICKS,
+                "advisory_template": "FOC-TPL-06 §5",
+                "advisory_status": "DRAFT",
             },
             notified=True,
         )
@@ -140,8 +149,12 @@ class R02OrangeAlert:
             return None
         f = _fmt(x)
         return Decision(
-            rule_id=self.id, rule_version=self.version, decision_type="alert",
-            zone_id=x.zone_id, severity="orange", alert_type="zone_risk",
+            rule_id=self.id,
+            rule_version=self.version,
+            decision_type="alert",
+            zone_id=x.zone_id,
+            severity="orange",
+            alert_type="zone_risk",
             message_en=(
                 f"ORANGE WARNING — {x.zone_name_en}: risk {f['risk']}. Street flooding likely; "
                 f"rain {f['rain']} mm/h, drainage {f['drain']} mm/h."
@@ -168,8 +181,12 @@ class R06YellowWatch:
             return None
         f = _fmt(x)
         return Decision(
-            rule_id=self.id, rule_version=self.version, decision_type="alert",
-            zone_id=x.zone_id, severity="yellow", alert_type="zone_risk",
+            rule_id=self.id,
+            rule_version=self.version,
+            decision_type="alert",
+            zone_id=x.zone_id,
+            severity="yellow",
+            alert_type="zone_risk",
             message_en=(
                 f"YELLOW WATCH — {x.zone_name_en}: risk {f['risk']}. Rain {f['rain']} mm/h; "
                 "avoid underpasses and low ground."
@@ -189,12 +206,10 @@ class R03UnderpassClosure:
     name_en = "Close underpasses on red alert"
     name_ar = "إغلاق الأنفاق عند التنبيه الأحمر"
     description_en = (
-        "RED alert AND zone has an underpass → action item: close underpass, divert traffic "
-        "(protocol FOC-SOP-01 §2.1)."
+        "RED alert AND zone has an underpass → action item: close underpass, divert traffic (protocol FOC-SOP-01 §2.1)."
     )
     description_ar = (
-        "تنبيه أحمر ومنطقة تحتوي على نفق → بند إجراء: إغلاق النفق وتحويل المرور "
-        "(البروتوكول FOC-SOP-01 §2.1)."
+        "تنبيه أحمر ومنطقة تحتوي على نفق → بند إجراء: إغلاق النفق وتحويل المرور (البروتوكول FOC-SOP-01 §2.1)."
     )
 
     def evaluate(self, x: RuleInputs) -> Decision | None:
@@ -202,12 +217,18 @@ class R03UnderpassClosure:
         if not x.has_underpass or x.active_level != "red" or "underpass_closure" in x.open_action_items:
             return None
         return Decision(
-            rule_id=self.id, rule_version=self.version, decision_type="action_item",
-            zone_id=x.zone_id, severity="red", alert_type="underpass_closure",
+            rule_id=self.id,
+            rule_version=self.version,
+            decision_type="action_item",
+            zone_id=x.zone_id,
+            severity="red",
+            alert_type="underpass_closure",
             message_en=f"CLOSE UNDERPASS — {x.zone_name_en}: barriers at both approaches; activate diversion route.",
             message_ar=f"إغلاق النفق — {x.zone_name_ar}: حواجز عند المدخلين؛ تفعيل مسار التحويل.",
             output={
-                "protocol": "FOC-SOP-01 §3", "diversion": "zone file route", "requires_operator_confirmation": True,
+                "protocol": "FOC-SOP-01 §3",
+                "diversion": "zone file route",
+                "requires_operator_confirmation": True,
             },
         )
 
@@ -230,8 +251,12 @@ class R07ClearDown:
         if x.active_level is None or x.consecutive_below_clear < CLEAR_CONSECUTIVE_TICKS:
             return None
         return Decision(
-            rule_id=self.id, rule_version=self.version, decision_type="clear",
-            zone_id=x.zone_id, severity=None, alert_type="zone_risk",
+            rule_id=self.id,
+            rule_version=self.version,
+            decision_type="clear",
+            zone_id=x.zone_id,
+            severity=None,
+            alert_type="zone_risk",
             message_en=f"ALERT CLEARED — {x.zone_name_en}: risk below {CLEAR_BELOW:.0f} for 60 minutes.",
             message_ar=f"انتهاء التنبيه — {x.zone_name_ar}: الخطورة دون {CLEAR_BELOW:.0f} لمدة 60 دقيقة.",
             output={"cleared_level": x.active_level, "advisory_template": "FOC-TPL-06 §7"},
@@ -240,7 +265,110 @@ class R07ClearDown:
 
 
 # Evaluation order matters: escalation rules highest-first, then dependents, then clear-down.
-RULES: list[Rule] = [R01RedAlert(), R02OrangeAlert(), R06YellowWatch(), R03UnderpassClosure(), R07ClearDown()]
+class R04PrePosition:
+    id = "R-04"
+    version = "1.0"
+    name_en = "Pre-position pumps on forecast risk"
+    name_ar = "تمركز مسبق للمضخات بناءً على التوقعات"
+    description_en = (
+        f"Forecast risk ≥ {ORANGE_THRESHOLD:.0f} within 6 h AND zero pump trucks staged in the zone "
+        "→ PRE-POSITION recommendation (SOP FOC-SOP-02 §3). Issued once per zone until assets arrive."
+    )
+    description_ar = (
+        f"خطورة متوقعة ≥ {ORANGE_THRESHOLD:.0f} خلال 6 ساعات ولا مضخات متمركزة في المنطقة "
+        "→ توصية بالتمركز المسبق (الإجراء FOC-SOP-02 §3). تصدر مرة واحدة لكل منطقة حتى وصول الأصول."
+    )
+
+    def evaluate(self, x: RuleInputs) -> Decision | None:
+        if x.forecast_risk_6h is None or x.forecast_risk_6h < ORANGE_THRESHOLD:
+            return None
+        if x.staged_assets > 0 or "preposition_pumps" in x.open_recommendations or x.risk >= ORANGE_THRESHOLD:
+            return None  # already covered, already recommended, or too late to be a pre-position
+        return Decision(
+            rule_id=self.id,
+            rule_version=self.version,
+            decision_type="recommendation",
+            zone_id=x.zone_id,
+            severity=None,
+            alert_type="preposition_pumps",
+            message_en=(
+                f"PRE-POSITION — {x.zone_name_en}: forecast risk {x.forecast_risk_6h:.0f} within 6 h "
+                f"(now {x.risk:.0f}) and no pump trucks staged. Stage trucks now — SOP FOC-SOP-02 §3."
+            ),
+            message_ar=(
+                f"تمركز مسبق — {x.zone_name_ar}: خطورة متوقعة {x.forecast_risk_6h:.0f} خلال 6 ساعات "
+                f"(حالياً {x.risk:.0f}) ولا مضخات متمركزة. تمركزوا الآن — الإجراء FOC-SOP-02 §3."
+            ),
+            output={
+                "threshold": ORANGE_THRESHOLD,
+                "horizon_h": 6,
+                "forecast_risk_6h": x.forecast_risk_6h,
+                "forecast_source": x.forecast_source,
+                "staged_assets": x.staged_assets,
+                "sop": "FOC-SOP-02 §3",
+            },
+        )
+
+
+class R05PlanValidation:
+    """Validates an agent-proposed dispatch plan. Does not fire on the timeline; `validate` is called by
+    rules.dispatch.validate_and_apply — the ONLY path that changes asset state (CLAUDE.md §7)."""
+
+    id = "R-05"
+    version = "1.0"
+    name_en = "Validate agent dispatch plan before execution"
+    name_ar = "التحقق من خطة إرسال الوكيل قبل التنفيذ"
+    description_en = (
+        "Agent-proposed plan → every zone must exist, allocations ≥ 0 and integer, total ≤ pump fleet, "
+        "and only zones at yellow or above (or with a pre-position recommendation) may receive trucks. "
+        "Applied only after an operator clicks APPROVE; the approval is logged with the operator id."
+    )
+    description_ar = (
+        "خطة يقترحها الوكيل → كل منطقة يجب أن تكون موجودة، والتخصيصات ≥ 0 وأعداد صحيحة، والمجموع ≤ أسطول "
+        "المضخات، ولا تُرسل شاحنات إلا لمناطق عند الأصفر فأعلى (أو ذات توصية تمركز مسبق). "
+        "تُطبق فقط بعد ضغط المشغل على اعتماد؛ ويُسجل الاعتماد مع معرف المشغل."
+    )
+
+    def evaluate(self, x: RuleInputs) -> Decision | None:  # noqa: ARG002 — not a timeline rule
+        return None
+
+    def validate(self, plan: dict, fleet_size: int, zones: dict[str, dict]) -> list[str]:
+        """Return the list of violations (empty = valid). `zones[id]` needs `risk` and `recommended`."""
+        errors: list[str] = []
+        alloc = plan.get("allocations") or {}
+        if not isinstance(alloc, dict) or not alloc:
+            return ["plan has no allocations"]
+        total = 0
+        for zid, n in alloc.items():
+            if zid not in zones:
+                errors.append(f"unknown zone {zid}")
+                continue
+            if not isinstance(n, int) or isinstance(n, bool) or n < 0:
+                errors.append(f"{zid}: allocation must be a non-negative integer")
+                continue
+            total += n
+            z = zones[zid]
+            if n > 0 and z.get("risk", 0.0) < YELLOW_THRESHOLD and not z.get("recommended", False):
+                errors.append(
+                    f"{zid}: risk {z.get('risk', 0):.0f} is below the yellow band "
+                    "and no pre-position recommendation is open"
+                )
+        if total > fleet_size:
+            errors.append(f"{total} trucks requested, fleet has {fleet_size}")
+        if total == 0 and not errors:
+            errors.append("plan allocates no trucks")
+        return errors
+
+
+RULES: list[Rule] = [
+    R01RedAlert(),
+    R02OrangeAlert(),
+    R06YellowWatch(),
+    R03UnderpassClosure(),
+    R04PrePosition(),
+    R07ClearDown(),
+    R05PlanValidation(),
+]
 
 
 def get_rule(rule_id: str) -> Rule:
@@ -254,9 +382,12 @@ def catalog() -> list[dict]:
     """Serialisable rule catalog for the Governance tab and /api/rules."""
     return [
         {
-            "id": r.id, "version": r.version,
-            "name_en": r.name_en, "name_ar": r.name_ar,
-            "description_en": r.description_en, "description_ar": r.description_ar,
+            "id": r.id,
+            "version": r.version,
+            "name_en": r.name_en,
+            "name_ar": r.name_ar,
+            "description_en": r.description_en,
+            "description_ar": r.description_ar,
         }
         for r in RULES
     ]

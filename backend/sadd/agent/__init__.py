@@ -1,1 +1,1 @@
-"""Rafid (رافد) — the ADK agent (Phase 3). Proposes and explains; never executes."""
+"""Rafid (رافد) — the ADK + Gemini agent. Explains, proposes and cites; never executes (CLAUDE.md §4, §8)."""

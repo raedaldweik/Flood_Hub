@@ -105,6 +105,12 @@ set it now. Follow the steps in order.
   is a build-time value. A project Map ID in `NEXT_PUBLIC_GOOGLE_MAP_ID` is optional (Google's
   `DEMO_MAP_ID` is used otherwise). If the vector map cannot start on a device, the app steps
   down to the satellite map by itself and says so in the browser console.
+- **Rafid says "Offline — GEMINI_API_KEY not set":** add `GEMINI_API_KEY` (Google AI Studio key) to
+  the `sadd-app` variables and Deploy. Nothing else is needed: the MCP Toolbox server and the
+  flood-forecasting MCP server run inside the same container (`backend/start.sh`), and Rafid
+  falls back to built-in query tools if Toolbox is not up yet. The panel header shows which is
+  in use ("MCP Toolbox" or "local db") and whether protocol search runs on `pgvector` or
+  `keyword` (run `make embed` once, or let the seed embed when the key is present).
 - **No towers on the 3D map:** the building volume is OpenStreetMap data fetched during the
   Docker build (`[buildings] wrote N towers` in the build log). If that line says `failed`,
   the Overpass API was busy — Deployments → ⋮ → **Redeploy** to fetch again. The pill on the
